@@ -18,6 +18,7 @@ import {
   reexecuteAttestation,
 } from "./attestation/verify.ts";
 import { registerAcceptCommand } from "./commands/accept.ts";
+import { registerCopyOutCommand } from "./commands/copy-out.ts";
 import { registerImplementCommand } from "./commands/implement.ts";
 import { registerReviewCommand } from "./commands/review.ts";
 import { registerRetroCommand } from "./commands/retro.ts";
@@ -322,6 +323,7 @@ export default function nucleusExtension(pi: ExtensionAPI): void {
   registerReviewCommand(pi, getConfig);
   registerAcceptCommand(pi, getConfig);
   registerRetroCommand(pi, getConfig);
+  registerCopyOutCommand(pi);
 
   function updateStatusUi(ctx: ExtensionContext): void {
     try {

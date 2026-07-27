@@ -124,9 +124,11 @@ export function registerReviewCommand(
       const nextState = loadState(ctx.cwd);
       const preferIsolated = !forceSameSession && supportsNewSession(ctx);
 
-      let isolation: IsolationMode = preferIsolated
-        ? "new_session"
-        : "same_session_fallback";
+      let isolation: IsolationMode = forceSameSession
+        ? "same_session_explicit"
+        : preferIsolated
+          ? "new_session"
+          : "same_session_fallback";
       const kickoff = writeReviewKickoff(ctx.cwd, bundle, {
         changeId: nextState.changeId,
         parentSession,
@@ -182,11 +184,13 @@ async function injectSameSession(
 ): Promise<void> {
   updateIsolationMode(ctx.cwd, isolation);
   const roleResult = await applyRole(pi, ctx, "reviewer", configResult);
+  const sameSessionNote =
+    isolation === "same_session_explicit"
+      ? "Reviewer · same-session (requested via /review same)"
+      : "Reviewer · same-session fallback (history may remain)";
   ctx.ui.notify(
-    roleResult.modelApplied
-      ? `Reviewer · same-session fallback (history may remain)`
-      : roleResult.message,
-    "warning",
+    roleResult.modelApplied ? sameSessionNote : roleResult.message,
+    isolation === "same_session_explicit" ? "info" : "warning",
   );
   pi.sendUserMessage(prompt);
   markKickoffDelivered(ctx.cwd);

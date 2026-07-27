@@ -8,6 +8,7 @@ import { buildReviewerContext } from "../src/context.ts";
 import {
   assertKickoffIsIsolated,
   buildIsolatedReviewPrompt,
+  formatIsolationMode,
   loadReviewSessionMeta,
   supportsNewSession,
   writeReviewKickoff,
@@ -80,6 +81,30 @@ describe("Phase 2.0 reviewer isolation helpers", () => {
     assert.equal(meta!.isolation, "new_session");
     assert.equal(meta!.kickoffDelivered, false);
     assert.equal(meta!.changeId, "chg-test");
+  });
+
+  it("formatIsolationMode distinguishes explicit same-session from fallback", () => {
+    assert.equal(formatIsolationMode("new_session"), "new_session");
+    assert.equal(formatIsolationMode("same_session_explicit"), "same_session (requested)");
+    assert.equal(formatIsolationMode("same_session_fallback"), "same_session (fallback)");
+  });
+
+  it("writeReviewKickoff records same_session_explicit when requested", async () => {
+    const cwd = tmp();
+    transitionPhase(cwd, "SpecDraft", { startNewChange: true });
+    transitionPhase(cwd, "SpecApproved");
+    transitionPhase(cwd, "Implementing");
+    await createAttestation(cwd, { command: "echo explicit" }, config);
+    const bundle = await buildReviewerContext(cwd, config, { reverify: false });
+
+    writeReviewKickoff(cwd, bundle, {
+      changeId: "chg-explicit",
+      parentSession: null,
+      isolation: "same_session_explicit",
+    });
+
+    const meta = loadReviewSessionMeta(cwd);
+    assert.equal(meta!.isolation, "same_session_explicit");
   });
 
   it("supportsNewSession detects ExtensionCommandContext capability", () => {

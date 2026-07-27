@@ -21,7 +21,22 @@ import {
 } from "./paths.ts";
 import type { ReviewerBundle } from "./context.ts"; // type-only; no runtime cycle
 
-export type IsolationMode = "new_session" | "same_session_fallback";
+export type IsolationMode =
+  | "new_session"
+  | "same_session_explicit"
+  | "same_session_fallback";
+
+/** Human-readable isolation label for status UI and notifications. */
+export function formatIsolationMode(mode: IsolationMode): string {
+  switch (mode) {
+    case "new_session":
+      return "new_session";
+    case "same_session_explicit":
+      return "same_session (requested)";
+    case "same_session_fallback":
+      return "same_session (fallback)";
+  }
+}
 
 export interface ReviewSessionMeta {
   version: 1;

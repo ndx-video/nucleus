@@ -16,7 +16,7 @@ import {
   suggestNextActions,
   type NextActionContext,
 } from "../next-actions.ts";
-import { loadReviewSessionMeta } from "../review-isolation.ts";
+import { formatIsolationMode, loadReviewSessionMeta } from "../review-isolation.ts";
 import { allowedNextPhases, loadState } from "../state.ts";
 import type { StatusSnapshot } from "../types.ts";
 
@@ -142,7 +142,7 @@ function formatIsolationBrief(cwd: string): string {
   if (!meta) return "— (default /review = new_session)";
   const reexec = meta.verificationMismatch ? "re-exec MISMATCH" : "re-exec ok";
   const kick = meta.kickoffDelivered ? "delivered" : "pending";
-  return `${meta.isolation} · kickoff ${kick} · ${reexec}`;
+  return `${formatIsolationMode(meta.isolation)} · kickoff ${kick} · ${reexec}`;
 }
 
 export function registerStatusCommands(

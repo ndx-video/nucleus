@@ -59,6 +59,7 @@ Spec (approved) → Implement → Attest (real capture) → Adversarial Review �
 - `/review` — Isolated Adversarial Reviewer (`/review same` = hybrid fallback)
 - `/accept` — Mark accepted after review pass (`/accept override <reason>` for human override)
 - `/retro` — Socratic interview that writes deterministic improvements back into project rules
+- `/copy-out [n]` — Copy Nth most recent assistant reply to `.nucleus/out/NNNN.md` (1 = most recent; filenames auto-increment)
 
 ### Phase State
 

@@ -16,6 +16,8 @@ export const GLOBAL_CONFIG_DIR = ".nucleus";
 export const REVIEW_SESSION_FILE = "review-session.json";
 /** Full Review Bundle text written for isolated session injection + audit */
 export const REVIEW_BUNDLE_FILE = "review-bundle.md";
+/** Incrementing export of assistant responses via /copy-out */
+export const OUT_DIR = "out";
 
 export function nucleusRoot(cwd: string): string {
   return resolve(cwd, NUCLEUS_DIR);
@@ -48,6 +50,10 @@ export function reviewBundlePath(cwd: string): string {
   return join(nucleusRoot(cwd), REVIEW_BUNDLE_FILE);
 }
 
+export function outDir(cwd: string): string {
+  return join(nucleusRoot(cwd), OUT_DIR);
+}
+
 export function projectConfigPath(cwd: string): string {
   return resolve(cwd, CONFIG_FILE);
 }
@@ -69,6 +75,10 @@ export function ensureNucleusLayout(cwd: string, storePath?: string): void {
   const specs = specsDir(cwd);
   if (!existsSync(specs)) {
     mkdirSync(specs, { recursive: true });
+  }
+  const out = outDir(cwd);
+  if (!existsSync(out)) {
+    mkdirSync(out, { recursive: true });
   }
 }
 

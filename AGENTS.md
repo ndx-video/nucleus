@@ -8,6 +8,8 @@ This repository implements **Nucleus**, a local-first Pi coding agent harness fo
 **Install one-liner:** `pi install git:github.com/ndx-video/nucleus`  
 (Do not use `pi install nucleus` — that npm name is unrelated.)
 
+**Pi slash commands:** Each Nucleus command (`/spec`, `/review`, `/accept`, …) must be sent as its **own message**. Multi-line blocks that *start with* `/review` or `/spec` plus a Spec/review brief are often **not** handled as extension commands — the model freestyles and phase never advances. Put long briefs in a **follow-up** message. See [docs §4a](./docs/index.md#4a-how-to-type-slash-commands-pi).
+
 ## Core Principles
 
 1. **Honesty over cleverness** — Prefer verifiable claims over confident statements. If something was not actually run, do not claim it was.

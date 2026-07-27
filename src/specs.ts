@@ -209,3 +209,30 @@ export function setActiveSpecPath(
   }
   saveState(cwd, state);
 }
+
+/** True if file exists and is more than an empty/template stub. */
+export function isSubstantialSpecFile(absPath: string): boolean {
+  if (!existsSync(absPath)) return false;
+  try {
+    const body = readFileSync(absPath, "utf-8").trim();
+    if (!body) return false;
+    if (body === SPEC_TEMPLATE.trim()) return false;
+    // Template with only whitespace edits still "empty" of intent — require a Goal-ish body
+    return body.length > SPEC_TEMPLATE.trim().length * 0.5 || /##\s*Goal/i.test(body);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * If state has no specPath but default current.md has real content, return it
+ * for adoption (agents often write the file before the harness registers the path).
+ */
+export function findAdoptableDefaultSpec(cwd: string): {
+  absPath: string;
+  relPath: string;
+} | null {
+  const abs = defaultSpecPath(cwd);
+  if (!isSubstantialSpecFile(abs)) return null;
+  return { absPath: abs, relPath: toProjectRelative(cwd, abs) };
+}

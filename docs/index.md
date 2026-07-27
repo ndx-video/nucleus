@@ -4,6 +4,8 @@
 
 This page is enough to install Nucleus and run the honesty loop on a real tiny change. Read it once; then use `/nucleus` when stuck.
 
+**Critical (Pi + Nucleus):** slash commands must be sent **alone**. Do not paste a Spec draft or review brief in the same message as `/spec` or `/review`. See [§4a How to type slash commands](#4a-how-to-type-slash-commands-pi).
+
 ---
 
 ## 1. What it is
@@ -105,10 +107,13 @@ You should see phase, role, models, and a **Next** action.
 | (after Accept) | `/spec` again | Prior Spec archived under `.nucleus/specs/archive/`; fresh `current.md` |
 | Implement | `/implement` | Implementer model + tools; Spec injected |
 | Attest | tool **`nucleus_attest`** | Harness runs your command, writes HMAC-tagged artifact |
-| Review | `/review` | Clean Reviewer session + Spec + Diff + Attest + re-exec |
-| Record verdict | `/review pass` or `/review fail …` | Phase → Accepted / Rejected |
-| Accept (alt) | `/accept` or `/accept override <reason>` | After pass, or human override |
+| Review | `/review` | Clean Reviewer session + Spec + Diff + Attest + re-exec; phase → **Reviewing** |
+| Record verdict | `/review pass` or `/accept` | From **Reviewing** → Accepted (either works) |
+| Reject | `/review fail …` | Phase → Rejected |
+| Override | `/accept override <reason>` | Skip review (recorded); not the default path |
 | Retro | `/retro` | Optional Socratic improvements to project rules |
+
+**Important:** Conversational “review looks good” does **not** change phase. You must run the **`/review` slash command** (phase stays **Attested** until the harness runs). Bare `/accept` while Attested will fail with a clear next-step message.
 
 **Attestation is a tool, not a slash command.** After implementation, the Implementer (or you) must call:
 
@@ -120,6 +125,115 @@ nucleus_attest
 Optional: `label`, `hash_files`, `cwd`, `timeout_ms`.
 
 **Review isolation:** `/review` prefers a **new Pi session** with only the Review Bundle. Debug/hybrid: `/review same`.
+
+---
+
+## 4a. How to type slash commands (Pi)
+
+Nucleus is a Pi **extension**. Its loop steps are **slash commands** (`/spec`, `/review`, …). Pi only invokes those commands when the message is a clean command (optional short args).  
+
+If you paste a **multi-line block that begins with** `/spec` or `/review` (command + Spec draft, or command + review brief), Pi often treats the **whole block as a normal user message**. The model may freestyle a “review,” but:
+
+- the Nucleus handler **does not run**
+- phase **does not** advance (e.g. stays **Attested**)
+- no Review Bundle / isolation kickoff appears
+- later `/accept` fails with “Cannot /accept in Attested…”
+
+### Rule
+
+| Do | Don’t |
+|----|--------|
+| Send **one** slash command per message | Put a Spec or long brief under the same message as `/spec` or `/review` |
+| Send long content as the **next** message | Assume “I typed /review at the top” means the harness ran |
+| Use only short args on the command line | Use multi-paragraph text as command “args” |
+
+### Correct: draft a Spec with a long brief
+
+**Message 1** (command only):
+
+```text
+/spec
+```
+
+Wait until Planner kicks off (notify / Spec path / `/nucleus` shows SpecDraft).
+
+**Message 2** (no leading slash — full brief):
+
+```text
+Draft the next Spec: Phase 2 — gRPC Bootstrap + Parties service.
+
+## Goal
+…
+
+## Locked decisions
+…
+
+## Acceptance criteria
+…
+```
+
+Optional short form for message 1 only:
+
+```text
+/spec Phase 2 — gRPC Bootstrap + Parties service
+```
+
+(That entire message must be **only** that line — then paste the full brief as message 2.)
+
+### Correct: start adversarial review
+
+**Message 1:**
+
+```text
+/review
+```
+
+You should see harness text starting with **`NUCLEUS — ISOLATED ADVERSARIAL REVIEW`** and phase **Reviewing**.  
+If you only see free-form “I’ll review against the Spec…” with no isolation header, the command did **not** run.
+
+**Then** (after the review finishes), **message 2:**
+
+```text
+/review pass
+```
+
+or (only once phase is **Reviewing**):
+
+```text
+/accept
+```
+
+### Safe command forms (entire message)
+
+```text
+/nucleus
+/n
+/spec
+/spec approve
+/spec new
+/spec path/to/file.md
+/spec Short goal hint only
+/implement
+/review
+/review same
+/review pass
+/review fail missing attestation for X
+/accept
+/accept override human approved despite residual risk
+/retro
+/copy-out 1
+```
+
+### How to tell the harness ran
+
+| Command | You should see |
+|---------|----------------|
+| `/nucleus` | Status panel (Phase / Role / Attest / Next) |
+| `/spec` | Planner kickoff; `specPath` set; often `.nucleus/specs/current.md` |
+| `/review` | **`NUCLEUS — ISOLATED ADVERSARIAL REVIEW`**, Review Bundle §§1–4, phase **Reviewing** |
+| `/review pass` or `/accept` (from Reviewing) | Phase **Accepted** |
+
+If `/review` only produces ad-hoc `read`/`find` with no isolation header, send bare `/review` again (alone).
 
 ---
 
@@ -179,20 +293,39 @@ pi install -l git:github.com/ndx-video/nucleus
 pi
 ```
 
-In Pi:
+In Pi (**one slash command per message**; long text in a follow-up — see [§4a](#4a-how-to-type-slash-commands-pi)):
 
 ```text
 /nucleus
+```
+
+```text
 /spec
-# Fill Goal / Acceptance Criteria: "add(2,3)===5; npm test passes"
+```
+
+```text
+Goal: add(2,3)===5; Acceptance: node --test passes. Keep the Spec lean.
+```
+
+```text
 /spec approve
+```
+
+```text
 /implement
-# Agent implements (or confirm existing code), then must call:
+```
+
+```text
+# Agent implements, then calls tool (not a slash command):
 #   nucleus_attest  command: "node --test"
+```
+
+```text
 /review
-# Isolated Reviewer; re-exec results in the bundle
+```
+
+```text
 /review pass
-# Optional: /retro
 ```
 
 If `/review` is blocked: `/nucleus` will say **0 verified attestations** — call `nucleus_attest` first.
@@ -222,10 +355,13 @@ Typical fields:
 | Cannot `/implement` | `/spec` then `/spec approve` first |
 | `/review` blocked — 0 verified | Call tool `nucleus_attest` with a real check command |
 | `/review` blocked — raw ids failed integrity | Forged/corrupt files; re-run `nucleus_attest` (do not hand-write JSON) |
-| Cannot `/accept` | `/review pass` first, or `/accept override <reason>` |
+| “I ran `/review`” but phase still **Attested** | Command likely **did not fire** (multi-line message). Send bare `/review` alone. Expect isolation header. |
+| Free-form review, no **ISOLATED ADVERSARIAL REVIEW** header | Same — not harness review. Resend `/review` alone. |
+| Cannot `/accept` in **Attested** | Harness never entered **Reviewing**. Bare `/review`, then `/review pass` or `/accept`. Or `/accept override <reason>` |
+| Cannot `/accept` in **Reviewing** with FAIL recorded | Fix via `/implement`, or override |
 | Model not found | Model string must match a provider Pi knows (`provider/id`) |
 | Reviewer lacks tools | Defaults inject `nucleus_verify`; check `roles.reviewer.allowed_tools` if customized |
-| Same-session review | Isolation fell back; check `.nucleus/review-session.json`; prefer `/review` without `same` |
+| Same-session review | Isolation fell back; check `.nucleus/review-session.json`; prefer bare `/review` |
 
 ### Where artifacts live
 
@@ -250,15 +386,27 @@ Typical fields:
 
 ## Commands cheat sheet
 
+Each line below = **one entire Pi message** (see [§4a](#4a-how-to-type-slash-commands-pi)).
+
 ```text
-/nucleus  /n
-/spec  /spec approve  /spec new  /spec path/to.md
+/nucleus
+/n
+/spec
+/spec approve
+/spec new
+/spec path/to.md
 /implement
-# tool nucleus_attest { command }
-/review  /review same  /review pass  /review fail <summary>
-/accept  /accept override <reason>
-/retro  /retro log
+/review
+/review same
+/review pass
+/review fail <summary>
+/accept
+/accept override <reason>
+/retro
+/copy-out 1
 ```
+
+Tool (not a slash command): `nucleus_attest` with `command: "…"`.
 
 ---
 

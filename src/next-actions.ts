@@ -52,11 +52,15 @@ export function suggestNextActions(
           "Then /review",
         ];
       }
-      return ["/review — isolated adversarial review"];
+      return [
+        "/review — start harness Reviewer (required; chat-only review does not advance phase)",
+        "Then /review pass or /accept — not /accept while still Attested",
+      ];
     case "Reviewing":
       return [
-        "Complete adversarial review (bundle already injected)",
-        "/review pass  or  /review fail <summary>",
+        "Finish adversarial review in this session",
+        "/review pass  or  /accept  → Accepted",
+        "/review fail <summary> → Rejected",
       ];
     case "Accepted":
       return ["/retro — optional rule improvements", "/spec — start a new change"];

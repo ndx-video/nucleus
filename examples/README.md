@@ -29,3 +29,5 @@ pi
   → nucleus_attest { command: "npm test" }
   → /review → /review pass|fail → /accept
 ```
+
+**Slash commands:** one command per Pi message. Do not paste a long Spec under `/spec` or a review brief under `/review` in the same message — see [docs §4a](../docs/index.md#4a-how-to-type-slash-commands-pi).

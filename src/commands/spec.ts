@@ -20,7 +20,10 @@ import {
   toProjectRelative,
 } from "../paths.ts";
 import { applyRole } from "../roles/index.ts";
-import { prepareFreshCurrentSpec } from "../specs.ts";
+import {
+  findAdoptableDefaultSpec,
+  prepareFreshCurrentSpec,
+} from "../specs.ts";
 import {
   ensureChangeId,
   loadState,
@@ -106,12 +109,13 @@ export function registerSpecCommand(
       const roleResult = await applyRole(pi, ctx, "planner", configResult);
 
       let state = loadState(ctx.cwd);
-      /** True when this /spec call starts a brand-new change (must rotate current.md). */
+      /** True when this /spec call starts a brand-new change. */
       let startedNewChange = false;
+      /** True when we rotated off an Accepted/Rejected change (must not reuse that Spec). */
+      let rotatedFromTerminal = false;
 
       if (state.phase === "Accepted" || state.phase === "Rejected") {
         try {
-          // Archive accepted/rejected Spec before clearing pointers via idle
           if (state.phase === "Accepted") {
             try {
               prepareFreshCurrentSpec(ctx.cwd, {
@@ -124,6 +128,7 @@ export function registerSpecCommand(
             }
           }
           transitionPhase(ctx.cwd, "idle", { note: "new change after terminal phase" });
+          rotatedFromTerminal = true;
         } catch {
           /* ignore */
         }
@@ -159,10 +164,11 @@ export function registerSpecCommand(
       let specAbs =
         safeResolveSpecPath(ctx.cwd, state.specPath) ?? defaultSpecPath(ctx.cwd);
       let archivedNote: string | null = null;
+      let adoptedExisting = false;
 
       try {
-        if (sub === "new" || startedNewChange) {
-          // Rotate working Spec: archive prior content, write fresh template to current.md
+        if (sub === "new" || (startedNewChange && rotatedFromTerminal)) {
+          // Explicit reset, or new change after Accept/Reject: archive + fresh template
           const fresh = prepareFreshCurrentSpec(ctx.cwd, {
             changeId: state.changeId,
             archiveLabel: sub === "new" ? "spec-new" : "new-change",
@@ -170,13 +176,35 @@ export function registerSpecCommand(
           });
           specAbs = fresh.absPath;
           archivedNote = fresh.archived;
-          // Clear prior-change review residue when opening a new working Spec
           state = loadState(ctx.cwd);
           state.specPath = fresh.specPath;
           state.reviewResult = null;
           state.overrideReason = null;
           state.role = "planner";
           saveState(ctx.cwd, state);
+        } else if (startedNewChange) {
+          // idle → SpecDraft but not after Accept: adopt pre-written current.md if substantial
+          const adoptable = findAdoptableDefaultSpec(ctx.cwd);
+          if (adoptable) {
+            specAbs = adoptable.absPath;
+            adoptedExisting = true;
+            state = loadState(ctx.cwd);
+            state.specPath = adoptable.relPath;
+            state.role = "planner";
+            saveState(ctx.cwd, state);
+          } else {
+            const fresh = prepareFreshCurrentSpec(ctx.cwd, {
+              changeId: state.changeId,
+              archiveLabel: "new-change",
+              writeTemplate: true,
+            });
+            specAbs = fresh.absPath;
+            archivedNote = fresh.archived;
+            state = loadState(ctx.cwd);
+            state.specPath = fresh.specPath;
+            state.role = "planner";
+            saveState(ctx.cwd, state);
+          }
         } else if (pathArg) {
           const resolved = safeResolveSpecPath(ctx.cwd, pathArg);
           if (!resolved) {
@@ -245,8 +273,11 @@ export function registerSpecCommand(
         archivedNote
           ? `Prior Spec archived at: ${archivedNote} (do not treat it as the active Spec).`
           : "",
-        startedNewChange || sub === "new"
+        startedNewChange && rotatedFromTerminal || sub === "new"
           ? "This is a **fresh working Spec** for the current change. Do not reintroduce prior-change acceptance notes unless the human asks."
+          : "",
+        adoptedExisting
+          ? "Adopted existing `.nucleus/specs/current.md` (already on disk). Refine it; do not discard unless the human asks."
           : "",
         goalHint ? `\n## User request / goal hint\n\n${goalHint}\n` : "",
         "Required sections: Goal, Constraints, Acceptance Criteria (testable), Out-of-Scope, Decision Log / Open Questions.",
@@ -264,7 +295,7 @@ export function registerSpecCommand(
 
       ctx.ui.notify(
         roleResult.modelApplied
-          ? `Planner · Spec ${rel}${archivedNote ? " · prior archived" : ""}${goalHint ? " · goal hint" : ""}`
+          ? `Planner · Spec ${rel}${adoptedExisting ? " · adopted existing" : ""}${archivedNote ? " · prior archived" : ""}${goalHint ? " · goal hint" : ""}`
           : roleResult.message,
         roleResult.modelApplied ? "info" : "warning",
       );
@@ -277,11 +308,29 @@ async function handleApprove(
   pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
 ): Promise<void> {
-  const state = loadState(ctx.cwd);
-  const abs = safeResolveSpecPath(ctx.cwd, state.specPath);
+  let state = loadState(ctx.cwd);
+  let abs = safeResolveSpecPath(ctx.cwd, state.specPath);
+
+  // Adopt orphan current.md: file written without harness registering specPath
   if (!state.specPath || !abs || !existsSync(abs)) {
-    ctx.ui.notify("No Spec on disk. Run /spec first.", "error");
-    return;
+    const adoptable = findAdoptableDefaultSpec(ctx.cwd);
+    if (adoptable) {
+      abs = adoptable.absPath;
+      state.specPath = adoptable.relPath;
+      state.role = "planner";
+      saveState(ctx.cwd, state);
+      ctx.ui.notify(
+        `Adopted existing Spec at ${adoptable.relPath} (was not registered in state).`,
+        "info",
+      );
+    } else {
+      const defaultAbs = defaultSpecPath(ctx.cwd);
+      const hint = existsSync(defaultAbs)
+        ? " Found a template/empty current.md — run /spec and fill it first."
+        : " Run /spec to create .nucleus/specs/current.md first.";
+      ctx.ui.notify(`No Spec on disk.${hint}`, "error");
+      return;
+    }
   }
 
   if (state.phase === "SpecApproved") {
@@ -294,11 +343,14 @@ async function handleApprove(
       startNewChange: !state.changeId,
       role: "planner",
       note: "draft opened for approve",
-      specPath: state.specPath,
+      // startNewChange clears specPath — re-apply after
+      specPath: undefined,
     });
     const s = loadState(ctx.cwd);
+    // Re-bind adopted/default path after startNewChange nulls specPath
     s.specPath = state.specPath;
     saveState(ctx.cwd, s);
+    state = s;
   }
 
   const s2 = loadState(ctx.cwd);

@@ -89,7 +89,10 @@ export function buildIsolatedReviewPrompt(bundle: ReviewerBundle): string {
     "--- END REVIEW BUNDLE ---",
     "",
     "Review now. Be skeptical. Optional second pass: `nucleus_verify`.",
-    "Human records outcome: `/review pass` or `/review fail <summary>`.",
+    "When finished, record the outcome with **one** of:",
+    "  · `/review pass`  or  `/accept`     → PASS → Accepted",
+    "  · `/review fail <summary>`          → FAIL → Rejected",
+    "(Conversational “looks good” alone does not move the phase — you must run the slash command.)",
   ].join("\n");
 }
 

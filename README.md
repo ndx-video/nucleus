@@ -58,6 +58,8 @@ Full walkthrough: **[docs/index.md](./docs/index.md)**.
 
 `/nucleus` (or `/n`) — phase, verified attestations, blocked reason, **next action**.
 
+**Pi slash commands:** send each command as its **own message** (e.g. only `/review`). Do **not** paste a Spec draft or long brief under the same message as `/spec` or `/review` — Pi will treat it as normal chat and Nucleus will not run. Long content goes in the **next** message. Details: [docs §4a](./docs/index.md#4a-how-to-type-slash-commands-pi).
+
 ---
 
 ## Three-layer honesty stack (live-validated 2026-07-27)

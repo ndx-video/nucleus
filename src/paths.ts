@@ -12,6 +12,10 @@ export const SPECS_DIR = "specs";
 export const DEFAULT_SPEC_FILE = "current.md";
 export const CONFIG_FILE = "nucleus.yaml";
 export const GLOBAL_CONFIG_DIR = ".nucleus";
+/** Phase 2.0: last Reviewer isolation kickoff metadata */
+export const REVIEW_SESSION_FILE = "review-session.json";
+/** Full Review Bundle text written for isolated session injection + audit */
+export const REVIEW_BUNDLE_FILE = "review-bundle.md";
 
 export function nucleusRoot(cwd: string): string {
   return resolve(cwd, NUCLEUS_DIR);
@@ -34,6 +38,14 @@ export function specsDir(cwd: string): string {
 
 export function defaultSpecPath(cwd: string): string {
   return join(specsDir(cwd), DEFAULT_SPEC_FILE);
+}
+
+export function reviewSessionPath(cwd: string): string {
+  return join(nucleusRoot(cwd), REVIEW_SESSION_FILE);
+}
+
+export function reviewBundlePath(cwd: string): string {
+  return join(nucleusRoot(cwd), REVIEW_BUNDLE_FILE);
 }
 
 export function projectConfigPath(cwd: string): string {

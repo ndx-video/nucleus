@@ -31,11 +31,12 @@ Incentive: faithfulness to the approved Spec ONLY.
 
   reviewer: `You are the Adversarial Reviewer in Nucleus, the Honesty Harness.
 Incentive: actively seek fabrication, missing evidence, scope drift, and Spec violations.
-- You receive ONLY: Spec + Diff + Attestation. Do not trust Implementer narrative.
-- Inspect attestation artifacts: real stdout/stderr/exit codes, timestamps, git fingerprints.
-- You may re-run commands with bash if suspicious.
+- You receive ONLY: Spec + Diff + verified Attestation + independent re-execution (clean session when isolation works).
+- Do not invent or trust Implementer narrative or prior chat history.
+- Inspect attestation artifacts: integrity HMAC, stdout/stderr/exit codes, git fingerprints.
+- Prefer nucleus_verify / harness re-exec results; exit_mismatch is strong FAIL evidence.
 - Default to skepticism. Produce a clear PASS or FAIL with concrete findings.
-- No write/edit of project source unless explicitly asked by the human (default tools are read-only).`,
+- No write/edit of project source (read + bash + nucleus_verify only).`,
 };
 
 export function loadRolePrompt(role: Role): string {

@@ -25,7 +25,8 @@ import { registerSpecCommand } from "./commands/spec.ts";
 import { registerStatusCommands } from "./commands/status.ts";
 import { loadConfig, type LoadConfigResult } from "./config.ts";
 import { ensureNucleusLayout } from "./paths.ts";
-import { roleSystemPromptSuffix } from "./roles/index.ts";
+import { loadReviewSessionMeta } from "./review-isolation.ts";
+import { applyRole, roleSystemPromptSuffix } from "./roles/index.ts";
 import { loadState } from "./state.ts";
 import type { Role } from "./types.ts";
 
@@ -49,13 +50,36 @@ export default function nucleusExtension(pi: ExtensionAPI): void {
   }
 
   // ─── Session start: load config + status widget ─────────────────────
-  pi.on("session_start", async (_event, ctx: ExtensionContext) => {
+  // Phase 2.0: after ctx.newSession(), this runs on the NEW extension instance
+  // BEFORE withSession injects the Review Bundle — apply Reviewer model/tools here.
+  pi.on("session_start", async (event, ctx: ExtensionContext) => {
     refreshConfig(ctx.cwd);
     try {
       const state = loadState(ctx.cwd);
       activeRole = state.role;
-      updateStatusUi(ctx);
-      if (configResult.error) {
+
+      // Isolated Reviewer session: disk says Reviewing/reviewer — enforce role on this instance
+      const reviewMeta = loadReviewSessionMeta(ctx.cwd);
+      const isReviewSession =
+        state.phase === "Reviewing" ||
+        state.role === "reviewer" ||
+        (reviewMeta && !reviewMeta.kickoffDelivered);
+
+      if (isReviewSession && state.phase === "Reviewing") {
+        const roleResult = await applyRole(pi, ctx, "reviewer", configResult);
+        activeRole = "reviewer";
+        const iso = reviewMeta?.isolation ?? "unknown";
+        ctx.ui.notify(
+          `Nucleus Reviewer session (${iso}) · ${roleResult.message}`,
+          roleResult.modelApplied ? "info" : "warning",
+        );
+        if (event.reason === "new" || event.reason === "fork") {
+          ctx.ui.notify(
+            "Clean session: no Implementer chat history. Work only from the Review Bundle.",
+            "info",
+          );
+        }
+      } else if (configResult.error) {
         ctx.ui.notify(`Nucleus: ${configResult.error}`, "warning");
       } else {
         ctx.ui.notify(
@@ -63,6 +87,8 @@ export default function nucleusExtension(pi: ExtensionAPI): void {
           "info",
         );
       }
+
+      updateStatusUi(ctx);
     } catch (err) {
       ctx.ui.notify(
         `Nucleus state error: ${err instanceof Error ? err.message : String(err)}`,

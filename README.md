@@ -79,18 +79,17 @@ Nucleus is deliberately thin in its first versions. It prioritises the honesty c
 
 ## Current Status
 
-**Phase 0 + Phase 1 implemented; live-validated 2026-07-27; Phase 1.1 integrity + Phase 1.2 independent re-exec applied.**
+**Phase 0–1.2 + Phase 2.0 (Reviewer isolation) implemented; Phase 1 live-validated 2026-07-27.**
 
 - TypeScript extension for hard enforcement (attestation, role switching, phase gates)
 - Skills for softer procedural knowledge (`skills/nucleus-spec`, `skills/retro`)
 - YAML model nomination via `nucleus.yaml`
-- Harness-owned `nucleus_attest` tool writing real artifacts under `.nucleus/attestations/`
-- **Integrity (1.1):** HMAC-SHA256 + `.nucleus/attest.key` — marker-only forgeries rejected
-- **Independent verify (1.2):** `/review` re-executes attested commands by default; `nucleus_verify` tool; status/`/review` gates count only verified artifacts
+- Harness-owned `nucleus_attest` + HMAC integrity (1.1) + independent re-exec (1.2)
+- **Reviewer isolation (2.0):** `/review` prefers a clean `newSession` with only the Review Bundle; `/review same` forces hybrid fallback
 - Commands: `/nucleus`, `/spec`, `/implement`, `/review`, `/accept`, `/retro`
 - Develop this package *outside* a running Nucleus/Pi session that loads itself
 
-**Residual trust:** stops casual model forgery and trusts re-execution mismatches as FAIL signals; not unforgeable against full local FS access to the attest key. See `AGENTS.md`.
+**Residual trust:** local-first HMAC + re-exec + session isolation; not remote attestation. Ambient AGENTS.md/skills may still load into the Reviewer session. See `AGENTS.md`.
 
 See `AGENTS.md` for the working contract. See `ROADMAP.md` for Phase 0/1 specs and later phases.
 
@@ -116,7 +115,8 @@ Then start Pi in the project and run `/nucleus` to verify status.
 /spec approve    → SpecApproved
 /implement       → Implementer model + restricted tools
 # Implementer must call tool: nucleus_attest { command: "npm test" }
-/review          → Adversarial Reviewer (Spec + Diff + Attestation)
+/review          → Isolated Reviewer session (Spec+Diff+Attestation+re-exec only)
+/review same     → Force same-session hybrid (fallback / debug)
 /review pass|fail
 /accept          # or /accept override <reason>
 /retro           → Socratic improvements to rules

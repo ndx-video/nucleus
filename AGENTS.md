@@ -35,7 +35,7 @@ Do **not** invent new top-level directories or artifacts without updating this f
 |------|-------------------|-------|
 | **Planner** | Completeness and clarity of intent | Prefer SOTA models. Human-led. |
 | **Implementer** | Faithfulness to the Spec only | Must produce real attestation. Restricted tools. |
-| **Adversarial Reviewer** | Actively seek fabrication, missing evidence, scope drift, Spec violations | Different model recommended. Clean context preferred (Spec + Diff + Attestation only). No write access by default. |
+| **Adversarial Reviewer** | Actively seek fabrication, missing evidence, scope drift, Spec violations | Different model recommended. **Phase 2.0:** clean new session (Spec + Diff + verified Attestation + re-exec only). No write access by default. |
 
 When acting in a role, stay in character. Do not mix incentives.
 
@@ -79,13 +79,14 @@ Keep Specs lean. Prefer one clear markdown artifact over many files in Phase 1.
 - The Adversarial Reviewer **must** receive and inspect the attestation. It may re-run commands if suspicious.
 - Fabricating or hand-writing an attestation is a critical honesty violation.
 
-### Residual trust model (Phase 1.1–1.2)
+### Residual trust model (Phase 1.1–2.0)
 
 - **Stops:** casual model forgery (hand-written JSON that only sets `capturedBy: "nucleus_attest"`), content tampering after a real capture, and status/`/review` gates that trusted raw state IDs without integrity load.
 - **Independent verification (1.2):** `/review` re-executes attested commands by default and embeds MATCH / EXIT MISMATCH / OUTPUT MISMATCH. Reviewer tool `nucleus_verify` can re-run again. Exit mismatch is a strong FAIL signal.
-- **Does not stop:** a malicious process with full filesystem access that can read `.nucleus/attest.key` and write a matching MAC; fully non-deterministic tests that pass once and fail on re-exec (surfaced as mismatch, not silently trusted).
+- **True Reviewer isolation (2.0):** `/review` prefers `ctx.newSession()` — a blank session that receives only the Review Bundle. Implementer chat history is not carried over. Fallback: `/review same` or automatic same-session hybrid if `newSession` is unavailable/cancelled (residual history risk — recorded in `.nucleus/review-session.json`).
+- **Does not stop:** a malicious process with full filesystem access that can read `.nucleus/attest.key` and write a matching MAC; fully non-deterministic tests that pass once and fail on re-exec (surfaced as mismatch); ambient project system context (AGENTS.md / skills) still loads into the new session (not Implementer chat, but not a vacuum).
 - This is intentional local-first design, not unforgeable remote attestation.
-- Phase 1 live-validated 2026-07-27 (`nucleus-test`); 1.1 closed marker-only forgery; 1.2 adds verified-only gates + independent re-execution.
+- Phase 1 live-validated 2026-07-27 (`nucleus-test`); 1.1 closed marker-only forgery; 1.2 verified-only gates + re-exec; 2.0 isolated Reviewer session.
 
 ## Model Nomination
 

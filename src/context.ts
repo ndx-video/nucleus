@@ -1,6 +1,7 @@
 /**
  * Restricted context for the Adversarial Reviewer:
- * Spec + Diff + verified Attestation + independent re-execution (Phase 1.2).
+ * Spec + Diff + verified Attestation + independent re-execution.
+ * Phase 2.0 injects this bundle into a clean session (no Implementer history).
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -161,7 +162,8 @@ export async function buildReviewerContext(
   const text = [
     "# Nucleus Adversarial Review Bundle",
     "",
-    "You are reviewing with RESTRICTED CONTEXT only. Ignore any prior Implementer narrative.",
+    "RESTRICTED ARTIFACTS ONLY (Phase 2.0 isolation target).",
+    "This bundle is the entire working set — there is no Implementer chat to trust.",
     "",
     `Change ID: ${state.changeId ?? "(none)"}`,
     `Phase: ${state.phase}`,

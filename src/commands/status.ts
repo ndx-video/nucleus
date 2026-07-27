@@ -8,6 +8,7 @@ import {
   latestVerifiedAttestationId,
 } from "../attestation/index.ts";
 import type { LoadConfigResult } from "../config.ts";
+import { loadReviewSessionMeta } from "../review-isolation.ts";
 import { allowedNextPhases, formatStatus, loadState } from "../state.ts";
 import type { StatusSnapshot } from "../types.ts";
 
@@ -63,12 +64,28 @@ export function formatFullStatus(
       : `  ERROR: ${snap.configError}`,
     "",
     "── Loop ──",
-    "  Spec → Implement → Attest → Review (+ independent re-exec) → Accept/Reject → Retro",
+    "  Spec → Implement → Attest → Review (isolated session + re-exec) → Accept/Reject → Retro",
+    "",
+    "── Isolation ──",
+    formatIsolationLine(cwd),
     "",
     "── Commands ──",
-    "  /spec  /implement  /review  /accept  /retro  /nucleus",
+    "  /spec  /implement  /review  /review same  /accept  /retro  /nucleus",
   ];
   return lines.join("\n");
+}
+
+function formatIsolationLine(cwd: string): string {
+  const meta = loadReviewSessionMeta(cwd);
+  if (!meta) {
+    return "  last review: (none yet) · default /review uses new_session isolation";
+  }
+  return [
+    `  last review: ${meta.isolation}`,
+    meta.kickoffDelivered ? "kickoff delivered" : "kickoff pending",
+    meta.verificationMismatch ? "re-exec MISMATCH" : "re-exec ok/pending",
+    meta.parentSession ? `parent=${meta.parentSession}` : "parent=(none)",
+  ].join(" · ");
 }
 
 export function registerStatusCommands(

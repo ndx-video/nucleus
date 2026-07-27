@@ -23,7 +23,7 @@ Establish a clean, local-first foundation so that Phase 1 can deliver a working 
 | Development environment | Build the package with Cursor / Claude Code / another harness | Avoids meta-confusion and circular debugging |
 | Package type | Proper Pi package (installable via `pi install`) | Clean extension surface, shareable later |
 | Config format | YAML (`nucleus.yaml`) | Human-readable model nomination + comments |
-| Role isolation (MVP) | Hybrid: same session for Planner + Implementer (strong prompts + filtering); new/forked session preferred for Adversarial Reviewer | Reviewer must not inherit Implementer “helpfulness” bias or full history |
+| Role isolation | Planner + Implementer: same session OK; **Reviewer (Phase 2.0): `ctx.newSession()` clean session with Review Bundle only** (fallback: same-session hybrid) | Reviewer must not inherit Implementer history or helpfulness bias |
 | Attestation | Harness-owned custom tool that captures *real* tool output | Prompt-only claims are leaky; real capture is the core honesty mechanism |
 | Spec format | Lightweight custom **Nucleus Spec** (markdown) | Low ceremony for solo use; can evolve later |
 | State | Visible, file-backed phase tracking under `.nucleus/` | Human always knows where the honesty gate currently is |
@@ -233,5 +233,29 @@ HMAC integrity + re-execution together. Still not remote attestation; flaky non-
 
 **Out of scope for 1.2**  
 Forked Reviewer sessions, free-text claim NLP, Phase 2 heavy hooks.
+
+---
+
+### Phase 2.0 — True Reviewer Isolation
+
+**Goal**  
+Run the Adversarial Reviewer in a clean context containing only Spec + Diff + verified Attestation(s) + independent re-execution results — no Implementer chain-of-thought or prior chat.
+
+**Mechanism**
+1. `/review` builds the Review Bundle (including harness re-exec) on disk under `.nucleus/review-bundle.md`.
+2. Preferred: `ctx.newSession({ withSession })` starts a blank session; `withSession` injects only the kickoff prompt (bundle + isolation header).
+3. New extension instance `session_start` applies Reviewer model + tools from disk phase/role before kickoff.
+4. Fallback: `/review same` or automatic same-session injection when `newSession` is missing/cancelled; isolation mode recorded in `.nucleus/review-session.json`.
+
+**Preserved layers**  
+HMAC integrity (1.1), verified-only gates + re-exec (1.2), phase machine, tool restrictions (no write/edit).
+
+**Residual limitations**
+- Ambient project system prompt resources (AGENTS.md, skills) may still load — not Implementer chat.
+- Same-session fallback retains residual history risk (explicitly labeled).
+- Not multi-reviewer batteries or free-text claim scanning.
+
+**Live-test criterion**  
+Reviewer session branch starts empty aside from the injected Review Bundle; no Implementer messages appear in session history.
 
 ---

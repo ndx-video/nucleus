@@ -1,6 +1,10 @@
 /**
- * /review — launch Adversarial Reviewer with Spec + Diff + verified Attestation
- * + independent re-execution (Phase 1.2).
+ * /review — Adversarial Reviewer with true session isolation (Phase 2.0).
+ *
+ * Preferred: ctx.newSession() → blank session → inject only Review Bundle.
+ * Fallback: same-session injection if newSession unavailable/cancelled.
+ *
+ * Preserves Phase 1.1 HMAC gates and Phase 1.2 independent re-execution.
  */
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
@@ -10,8 +14,15 @@ import {
 } from "../attestation/index.ts";
 import type { LoadConfigResult } from "../config.ts";
 import { buildReviewerContext } from "../context.ts";
+import {
+  markKickoffDelivered,
+  supportsNewSession,
+  updateIsolationMode,
+  writeReviewKickoff,
+  type IsolationMode,
+} from "../review-isolation.ts";
 import { applyRole } from "../roles/index.ts";
-import { loadState, saveState, transitionPhase } from "../state.ts";
+import { loadState, saveState, setRole, transitionPhase } from "../state.ts";
 import type { ReviewResult } from "../types.ts";
 
 export function registerReviewCommand(
@@ -20,7 +31,7 @@ export function registerReviewCommand(
 ): void {
   pi.registerCommand("review", {
     description:
-      "Adversarial review (Spec+Diff+verified Attestation+re-exec). Args: pass | fail [findings...] | (none = start review)",
+      "Isolated adversarial review (new session: Spec+Diff+Attestation+re-exec). Args: pass | fail | same",
     handler: async (args, ctx: ExtensionCommandContext) => {
       const configResult = getConfig();
       const trimmed = (args ?? "").trim();
@@ -32,13 +43,15 @@ export function registerReviewCommand(
         return;
       }
 
+      // Force same-session hybrid isolation (debug / environments without newSession)
+      const forceSameSession = sub === "same" || sub === "--same-session";
+
       const state = loadState(ctx.cwd);
       const storePath = configResult.config?.attestation.store_path;
       const verifiedCount = countVerifiedAttestations(ctx.cwd, storePath);
       const hasVerified = verifiedCount > 0;
       const rawCount = state.attestationIds.length;
 
-      // Gate: need at least one integrity-verified attestation when required
       const attRequired = configResult.config?.attestation.required !== false;
       if (attRequired && !hasVerified) {
         const detail =
@@ -68,7 +81,7 @@ export function registerReviewCommand(
         return;
       }
 
-      // Advance to Reviewing only when a verified attestation exists
+      // Advance phase + role on disk (survives session replacement)
       if (phase === "Implementing" && hasVerified) {
         transitionPhase(ctx.cwd, "Attested", {
           note: "verified attestation present before review",
@@ -78,13 +91,14 @@ export function registerReviewCommand(
       if (s2.phase === "Attested") {
         transitionPhase(ctx.cwd, "Reviewing", {
           role: "reviewer",
-          note: "adversarial review started (with independent re-exec)",
+          note: "adversarial review started (Phase 2.0 isolation)",
         });
+      } else {
+        setRole(ctx.cwd, "reviewer");
       }
 
-      const roleResult = await applyRole(pi, ctx, "reviewer", configResult);
-
-      // Default: harness re-executes attested commands into the bundle
+      // Build bundle with independent re-execution BEFORE session switch
+      // (plain data only survives into withSession)
       const bundle = await buildReviewerContext(ctx.cwd, configResult.config, {
         reverify: true,
       });
@@ -102,20 +116,96 @@ export function registerReviewCommand(
         );
       }
 
-      const prompt = [
-        bundle.text,
-        "",
-        "---",
-        "Perform the adversarial review now. Be skeptical.",
-        "Independent re-execution results are already in the bundle (section 4).",
-        "You may call `nucleus_verify` for a second pass if needed.",
-        "When finished, the human can record the outcome with `/review pass` or `/review fail <summary>`.",
-      ].join("\n");
+      let parentSession: string | null = null;
+      try {
+        parentSession = ctx.sessionManager.getSessionFile() ?? null;
+      } catch {
+        parentSession = null;
+      }
 
-      ctx.ui.notify(roleResult.message, roleResult.modelApplied ? "info" : "warning");
-      pi.sendUserMessage(prompt);
+      const nextState = loadState(ctx.cwd);
+      const preferIsolated = !forceSameSession && supportsNewSession(ctx);
+
+      // Write kickoff assuming preferred mode; may update to fallback
+      let isolation: IsolationMode = preferIsolated
+        ? "new_session"
+        : "same_session_fallback";
+      const kickoff = writeReviewKickoff(ctx.cwd, bundle, {
+        changeId: nextState.changeId,
+        parentSession,
+        isolation,
+      });
+
+      if (preferIsolated) {
+        try {
+          // Capture plain strings only — do not use old pi/ctx inside withSession
+          const promptText = kickoff.prompt;
+          const mismatch = bundle.hasVerificationMismatch;
+
+          const result = await ctx.newSession({
+            parentSession: parentSession ?? undefined,
+            withSession: async (newCtx) => {
+              // New extension instance already ran session_start (applies reviewer role/tools).
+              // Inject ONLY the Review Bundle as the first user message.
+              await newCtx.sendUserMessage(promptText);
+              markKickoffDelivered(newCtx.cwd);
+              newCtx.ui.notify(
+                "Nucleus: isolated Reviewer session — Spec+Diff+Attestation+re-exec only (no Implementer history)",
+                "info",
+              );
+              if (mismatch) {
+                newCtx.ui.notify(
+                  "Independent re-execution mismatch — default to FAIL unless explained",
+                  "warning",
+                );
+              }
+            },
+          });
+
+          if (result.cancelled) {
+            isolation = "same_session_fallback";
+            updateIsolationMode(ctx.cwd, isolation);
+            await injectSameSession(pi, ctx, configResult, kickoff.prompt, isolation);
+            return;
+          }
+
+          // Successfully switched — old session runtime is gone; do not use old pi.
+          return;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          isolation = "same_session_fallback";
+          updateIsolationMode(ctx.cwd, isolation);
+          ctx.ui.notify(
+            `Isolated newSession failed (${msg}); falling back to same-session review.`,
+            "warning",
+          );
+          await injectSameSession(pi, ctx, configResult, kickoff.prompt, isolation);
+          return;
+        }
+      }
+
+      // Forced same-session or no newSession API
+      await injectSameSession(pi, ctx, configResult, kickoff.prompt, isolation);
     },
   });
+}
+
+async function injectSameSession(
+  pi: ExtensionAPI,
+  ctx: ExtensionCommandContext,
+  configResult: LoadConfigResult,
+  prompt: string,
+  isolation: IsolationMode,
+): Promise<void> {
+  updateIsolationMode(ctx.cwd, isolation);
+  const roleResult = await applyRole(pi, ctx, "reviewer", configResult);
+  ctx.ui.notify(
+    `Nucleus: ${isolation === "same_session_fallback" ? "same-session fallback" : isolation} review (hybrid isolation — residual history may remain)`,
+    "warning",
+  );
+  ctx.ui.notify(roleResult.message, roleResult.modelApplied ? "info" : "warning");
+  pi.sendUserMessage(prompt);
+  markKickoffDelivered(ctx.cwd);
 }
 
 async function recordVerdict(
@@ -181,5 +271,4 @@ async function recordVerdict(
   }
 }
 
-// re-export for tests
 export { hasVerifiedAttestation };

@@ -44,7 +44,7 @@
     ]
   },
   "scripts": {
-    "test": "tsx --test test/config.test.ts test/state.test.ts test/attestation.test.ts test/verify.test.ts test/isolation.test.ts test/status.test.ts",
+    "test": "tsx --test test/config.test.ts test/state.test.ts test/attestation.test.ts test/verify.test.ts test/isolation.test.ts test/status.test.ts test/spec-path.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

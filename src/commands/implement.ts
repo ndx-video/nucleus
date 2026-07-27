@@ -3,9 +3,9 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import type { LoadConfigResult } from "../config.ts";
+import { safeResolveSpecPath } from "./spec.ts";
 import { applyRole } from "../roles/index.ts";
 import { loadState, transitionPhase } from "../state.ts";
 
@@ -40,7 +40,8 @@ export function registerImplementCommand(
         return;
       }
 
-      if (!state.specPath || !existsSync(resolve(ctx.cwd, state.specPath))) {
+      const specAbs = safeResolveSpecPath(ctx.cwd, state.specPath);
+      if (!state.specPath || !specAbs || !existsSync(specAbs)) {
         ctx.ui.notify("No Spec on disk. Run /spec, then /spec approve.", "error");
         return;
       }
@@ -56,7 +57,8 @@ export function registerImplementCommand(
 
       const roleResult = await applyRole(pi, ctx, "implementer", configResult);
       const next = loadState(ctx.cwd);
-      const specBody = readFileSync(resolve(ctx.cwd, next.specPath!), "utf-8");
+      const nextAbs = safeResolveSpecPath(ctx.cwd, next.specPath) ?? specAbs;
+      const specBody = readFileSync(nextAbs, "utf-8");
 
       const prompt = [
         "You are the Implementer. Faithfulness to the Spec only.",

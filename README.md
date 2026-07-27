@@ -1,10 +1,23 @@
-# Nucleus
+# Nucleus by NDX Pty Ltd
 
 **The Honesty Harness**
 
+**Official site:** [https://nucleuspi.dev](https://nucleuspi.dev)
+
 > Agents can lie. Nucleus makes lying hard and detection automatic.
 
-Nucleus is a local-first coding agent harness built on [Pi](https://pi.dev). Its primary purpose is to restore trust in generative coding.
+Nucleus by NDX Pty Ltd is a local-first coding agent harness built on [Pi](https://pi.dev). Its primary purpose is to restore trust in generative coding.
+
+This repository is the open-source project source. Product information,
+documentation, and project news live on the official site.
+
+## Source & community
+
+| | |
+|--|--|
+| **Website** | [nucleuspi.dev](https://nucleuspi.dev) |
+| **Source** | [github.com/ndx-video/nucleus](https://github.com/ndx-video/nucleus) |
+| **Contributing** | [CONTRIBUTING.md](./CONTRIBUTING.md) |
 
 Most agent workflows optimize for speed and autonomy. Nucleus optimizes for **verifiability**. It treats the tendency of language models to fabricate results, claim tests passed when they did not, or drift from the original intent as a first-class engineering problem rather than an inconvenience.
 
@@ -141,4 +154,11 @@ Nucleus exists to make the cost of dishonesty high and the path of verifiable wo
 
 ## License
 
-TBD
+**Nucleus by NDX Pty Ltd** is licensed under the **Apache License, Version 2.0**.
+See [LICENSE](./LICENSE) and [NOTICE](./NOTICE).
+
+Copyright 2026 NDX Pty Ltd and contributors.
+
+You are free to use, modify, and redistribute Nucleus — including in commercial
+and internal products — under those terms. Contributions are welcome under the
+same license; see [CONTRIBUTING.md](./CONTRIBUTING.md).

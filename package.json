@@ -1,7 +1,7 @@
 {
   "name": "nucleus",
   "version": "0.1.0",
-  "description": "Nucleus — The Honesty Harness. Local-first Pi package that makes agent fabrication hard and detection automatic.",
+  "description": "Nucleus by NDX Pty Ltd \u2014 The Honesty Harness. Local-first Pi package that makes agent fabrication hard and detection automatic.",
   "type": "module",
   "keywords": [
     "pi-package",
@@ -10,7 +10,7 @@
     "attestation",
     "spec-driven"
   ],
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "pi": {
     "extensions": [
       "./src/index.ts"
@@ -42,5 +42,13 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "homepage": "https://nucleuspi.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ndx-video/nucleus.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ndx-video/nucleus/issues"
   }
 }

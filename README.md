@@ -66,14 +66,44 @@ Nucleus is deliberately thin in its first versions. It prioritises the honesty c
 
 ## Current Status
 
-Phase 0 (Foundations) and Phase 1 (Minimal Viable Loop) have detailed specifications. The project is being built as a proper Pi package with:
+**Phase 0 (Foundations) and Phase 1 (Minimal Viable Loop) are implemented.**
 
-- TypeScript extensions for hard enforcement (attestation, role switching, phase gates)
-- Skills for softer procedural knowledge
-- YAML-based model nomination
-- A clear development rule: the package itself is developed *outside* a running Nucleus session to avoid meta-confusion
+- TypeScript extension for hard enforcement (attestation, role switching, phase gates)
+- Skills for softer procedural knowledge (`skills/nucleus-spec`, `skills/retro`)
+- YAML model nomination via `nucleus.yaml`
+- Harness-owned `nucleus_attest` tool writing real artifacts under `.nucleus/attestations/`
+- Commands: `/nucleus`, `/spec`, `/implement`, `/review`, `/accept`, `/retro`
+- Develop this package *outside* a running Nucleus/Pi session that loads itself
 
-See `AGENTS.md` for the full working contract that agents operating in this repository must follow.
+See `AGENTS.md` for the working contract. See `ROADMAP.md` for Phase 0/1 specs and later phases.
+
+---
+
+## Install (Pi)
+
+```bash
+# From a project that should use Nucleus (project-local install)
+pi install -l /absolute/path/to/nucleus
+
+# Or copy example config
+cp /path/to/nucleus/nucleus.config.example.yaml ./nucleus.yaml
+# Edit models.* to match providers configured in your Pi setup
+```
+
+Then start Pi in the project and run `/nucleus` to verify status.
+
+### Honesty loop
+
+```text
+/spec            → draft Nucleus Spec (Planner model)
+/spec approve    → SpecApproved
+/implement       → Implementer model + restricted tools
+# Implementer must call tool: nucleus_attest { command: "npm test" }
+/review          → Adversarial Reviewer (Spec + Diff + Attestation)
+/review pass|fail
+/accept          # or /accept override <reason>
+/retro           → Socratic improvements to rules
+```
 
 ---
 

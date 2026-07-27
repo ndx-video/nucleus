@@ -1,0 +1,46 @@
+{
+  "name": "nucleus",
+  "version": "0.1.0",
+  "description": "Nucleus — The Honesty Harness. Local-first Pi package that makes agent fabrication hard and detection automatic.",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "pi-coding-agent",
+    "honesty",
+    "attestation",
+    "spec-driven"
+  ],
+  "license": "UNLICENSED",
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "scripts": {
+    "test": "tsx --test test/config.test.ts test/state.test.ts test/attestation.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "yaml": "^2.7.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.80.10",
+    "@types/node": "^22.10.0",
+    "tsx": "^4.23.1",
+    "typebox": "^1.0.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

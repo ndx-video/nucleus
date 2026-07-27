@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.nucleus/
+*.tsbuildinfo
+.DS_Store
+*.log
+.pi/npm/
+.pi/git/
+.results/

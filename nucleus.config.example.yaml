@@ -1,0 +1,36 @@
+# Nucleus — model nomination + role config (source of truth)
+# Copy to nucleus.yaml in your project root (or ~/.nucleus/nucleus.yaml).
+#
+# Model refs: provider/model-id
+# Examples: anthropic/claude-sonnet-4, openai/gpt-4.1, ollama/llama3.2
+
+models:
+  planner: "anthropic/claude-opus-4"        # prefer SOTA for planning
+  implementer: "anthropic/claude-sonnet-4" # mid-tier is fine
+  reviewer: "openai/gpt-4.1"               # deliberately different model recommended
+
+roles:
+  implementer:
+    allowed_tools:
+      - read
+      - write
+      - edit
+      - bash
+      - grep
+      - find
+      - ls
+      - nucleus_attest
+  reviewer:
+    # No write/edit by default — adversarial isolation
+    allowed_tools:
+      - read
+      - bash
+      - grep
+      - find
+      - ls
+    adversarial: true
+
+attestation:
+  required: true
+  store_path: ".nucleus/attestations/"
+  require_real_stdout: true

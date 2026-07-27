@@ -1,0 +1,19 @@
+# Example project config for Nucleus.
+# Copy to the project root as nucleus.yaml and edit model names to match your Pi setup.
+
+models:
+  planner: "anthropic/claude-opus-4"
+  implementer: "anthropic/claude-sonnet-4"
+  reviewer: "openai/gpt-4.1"
+
+roles:
+  implementer:
+    allowed_tools: ["read", "write", "edit", "bash", "grep", "find", "ls", "nucleus_attest"]
+  reviewer:
+    allowed_tools: ["read", "bash", "grep", "find", "ls"]
+    adversarial: true
+
+attestation:
+  required: true
+  store_path: ".nucleus/attestations/"
+  require_real_stdout: true

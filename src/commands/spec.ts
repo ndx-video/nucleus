@@ -20,6 +20,7 @@ import {
   toProjectRelative,
 } from "../paths.ts";
 import { applyRole } from "../roles/index.ts";
+import { prepareFreshCurrentSpec } from "../specs.ts";
 import {
   ensureChangeId,
   loadState,
@@ -105,8 +106,23 @@ export function registerSpecCommand(
       const roleResult = await applyRole(pi, ctx, "planner", configResult);
 
       let state = loadState(ctx.cwd);
+      /** True when this /spec call starts a brand-new change (must rotate current.md). */
+      let startedNewChange = false;
+
       if (state.phase === "Accepted" || state.phase === "Rejected") {
         try {
+          // Archive accepted/rejected Spec before clearing pointers via idle
+          if (state.phase === "Accepted") {
+            try {
+              prepareFreshCurrentSpec(ctx.cwd, {
+                changeId: state.changeId,
+                archiveLabel: "accepted-pre-new",
+                writeTemplate: false,
+              });
+            } catch {
+              /* archive best-effort */
+            }
+          }
           transitionPhase(ctx.cwd, "idle", { note: "new change after terminal phase" });
         } catch {
           /* ignore */
@@ -119,6 +135,7 @@ export function registerSpecCommand(
           role: "planner",
           note: "spec draft started",
         });
+        startedNewChange = true;
       } else if (state.phase !== "SpecDraft" && state.phase !== "SpecApproved") {
         ctx.ui.notify(
           `Phase is ${state.phase}. Continuing in Planner; approve/reject path may be needed later.`,
@@ -141,12 +158,25 @@ export function registerSpecCommand(
 
       let specAbs =
         safeResolveSpecPath(ctx.cwd, state.specPath) ?? defaultSpecPath(ctx.cwd);
+      let archivedNote: string | null = null;
 
       try {
-        if (sub === "new") {
-          ensureNucleusLayout(ctx.cwd);
-          specAbs = defaultSpecPath(ctx.cwd);
-          writeTemplate(specAbs);
+        if (sub === "new" || startedNewChange) {
+          // Rotate working Spec: archive prior content, write fresh template to current.md
+          const fresh = prepareFreshCurrentSpec(ctx.cwd, {
+            changeId: state.changeId,
+            archiveLabel: sub === "new" ? "spec-new" : "new-change",
+            writeTemplate: true,
+          });
+          specAbs = fresh.absPath;
+          archivedNote = fresh.archived;
+          // Clear prior-change review residue when opening a new working Spec
+          state = loadState(ctx.cwd);
+          state.specPath = fresh.specPath;
+          state.reviewResult = null;
+          state.overrideReason = null;
+          state.role = "planner";
+          saveState(ctx.cwd, state);
         } else if (pathArg) {
           const resolved = safeResolveSpecPath(ctx.cwd, pathArg);
           if (!resolved) {
@@ -162,7 +192,6 @@ export function registerSpecCommand(
           }
         } else if (!existsSync(specAbs)) {
           ensureNucleusLayout(ctx.cwd);
-          // If prior state.specPath was invalid/oversized, fall back to default
           if (!safeResolveSpecPath(ctx.cwd, state.specPath)) {
             specAbs = defaultSpecPath(ctx.cwd);
           }
@@ -188,7 +217,6 @@ export function registerSpecCommand(
       }
 
       const rel = toProjectRelative(ctx.cwd, specAbs);
-      // Guard against storing unusable paths in state
       if (rel.length > MAX_SPEC_PATH_CHARS) {
         ctx.ui.notify("Resolved Spec path is too long; refusing to store it.", "error");
         return;
@@ -214,6 +242,12 @@ export function registerSpecCommand(
         `Spec path: ${rel}`,
         `Change: ${state.changeId}`,
         `Phase: ${state.phase}`,
+        archivedNote
+          ? `Prior Spec archived at: ${archivedNote} (do not treat it as the active Spec).`
+          : "",
+        startedNewChange || sub === "new"
+          ? "This is a **fresh working Spec** for the current change. Do not reintroduce prior-change acceptance notes unless the human asks."
+          : "",
         goalHint ? `\n## User request / goal hint\n\n${goalHint}\n` : "",
         "Required sections: Goal, Constraints, Acceptance Criteria (testable), Out-of-Scope, Decision Log / Open Questions.",
         "Keep it lean. When the human is satisfied, run `/spec approve`.",
@@ -230,7 +264,7 @@ export function registerSpecCommand(
 
       ctx.ui.notify(
         roleResult.modelApplied
-          ? `Planner · Spec ${rel}${goalHint ? " · with goal hint" : ""}`
+          ? `Planner · Spec ${rel}${archivedNote ? " · prior archived" : ""}${goalHint ? " · goal hint" : ""}`
           : roleResult.message,
         roleResult.modelApplied ? "info" : "warning",
       );

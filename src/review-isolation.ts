@@ -27,7 +27,7 @@ export type IsolationMode =
   | "same_session_fallback";
 
 /** Human-readable isolation label for status UI and notifications. */
-export function formatIsolationMode(mode: IsolationMode): string {
+export function formatIsolationMode(mode: IsolationMode | string | undefined): string {
   switch (mode) {
     case "new_session":
       return "new_session";
@@ -35,6 +35,8 @@ export function formatIsolationMode(mode: IsolationMode): string {
       return "same_session (requested)";
     case "same_session_fallback":
       return "same_session (fallback)";
+    default:
+      return mode ? String(mode) : "unknown";
   }
 }
 

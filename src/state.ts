@@ -5,6 +5,12 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
+import {
+  appendAttestationHistory,
+  appendChangeBoundary,
+  appendTransitionHistory,
+  migrateNotesToHistory,
+} from "./history.ts";
 import { ensureNucleusLayout, statePath } from "./paths.ts";
 import {
   PHASE_TRANSITIONS,
@@ -59,6 +65,45 @@ function isRole(value: unknown): value is Role {
   return value === "planner" || value === "implementer" || value === "reviewer";
 }
 
+/**
+ * Normalize reviewResult from disk. Hand-edited or legacy state may store
+ * a bare string ("pass") instead of { verdict, findings }.
+ */
+export function normalizeReviewResult(raw: unknown): ReviewResult | null {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === "string") {
+    const v = raw.toLowerCase();
+    if (v === "pass" || v === "fail") {
+      return {
+        verdict: v,
+        findings: ["(legacy/hand-edited reviewResult string)"],
+        reviewedAt: nowIso(),
+      };
+    }
+    return null;
+  }
+  if (typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const verdict =
+    o.verdict === "pass" || o.verdict === "fail"
+      ? o.verdict
+      : typeof o.verdict === "string" && o.verdict.toLowerCase() === "pass"
+        ? "pass"
+        : typeof o.verdict === "string" && o.verdict.toLowerCase() === "fail"
+          ? "fail"
+          : null;
+  if (!verdict) return null;
+  const findings = Array.isArray(o.findings)
+    ? o.findings.filter((x): x is string => typeof x === "string")
+    : [];
+  return {
+    verdict,
+    findings,
+    reviewedAt: typeof o.reviewedAt === "string" ? o.reviewedAt : nowIso(),
+    reviewerModel: typeof o.reviewerModel === "string" ? o.reviewerModel : undefined,
+  };
+}
+
 export function parseState(raw: unknown): NucleusState {
   if (typeof raw !== "object" || raw === null) {
     throw new StateError("state.json must be an object");
@@ -82,7 +127,7 @@ export function parseState(raw: unknown): NucleusState {
     attestationIds: Array.isArray(o.attestationIds)
       ? o.attestationIds.filter((x): x is string => typeof x === "string")
       : [],
-    reviewResult: (o.reviewResult as ReviewResult | null) ?? null,
+    reviewResult: normalizeReviewResult(o.reviewResult),
     overrideReason: typeof o.overrideReason === "string" || o.overrideReason === null
       ? (o.overrideReason as string | null)
       : null,
@@ -102,7 +147,17 @@ export function loadState(cwd: string): NucleusState {
   }
   try {
     const text = readFileSync(path, "utf-8");
-    return parseState(JSON.parse(text));
+    const state = parseState(JSON.parse(text));
+    // One-time migration: ballooning notes[] → append-only history.jsonl
+    if (state.notes.length > 0) {
+      migrateNotesToHistory(cwd, state.notes, {
+        changeId: state.changeId,
+        phase: state.phase,
+      });
+      state.notes = [];
+      saveState(cwd, state);
+    }
+    return state;
   } catch (err) {
     throw new StateError(
       `Failed to load ${path}: ${err instanceof Error ? err.message : String(err)}`,
@@ -152,6 +207,9 @@ export function transitionPhase(
     );
   }
 
+  const fromPhase = state.phase;
+  const previousChangeId = state.changeId;
+
   state.phase = to;
   if (options?.role) state.role = options.role;
   if (options?.specPath !== undefined) state.specPath = options.specPath;
@@ -163,6 +221,14 @@ export function transitionPhase(
     state.attestationIds = [];
     state.reviewResult = null;
     state.overrideReason = null;
+    // Do not reuse prior change's Spec path — caller should set a fresh current.md
+    state.specPath = null;
+    state.notes = [];
+    appendChangeBoundary(cwd, {
+      previousChangeId,
+      newChangeId: state.changeId,
+      phase: to,
+    });
   }
   if (to === "idle") {
     state.changeId = null;
@@ -171,13 +237,17 @@ export function transitionPhase(
     state.reviewResult = null;
     state.overrideReason = null;
     state.role = "planner";
+    state.notes = [];
   }
+  // History goes to history.jsonl — never balloon state.json
+  state.notes = [];
   if (options?.note) {
-    state.notes.push(`[${nowIso()}] ${state.phase}: ${options.note}`);
-    // Cap notes to keep state lean
-    if (state.notes.length > 50) {
-      state.notes = state.notes.slice(-50);
-    }
+    appendTransitionHistory(cwd, {
+      changeId: state.changeId,
+      fromPhase,
+      toPhase: to,
+      note: options.note,
+    });
   }
 
   saveState(cwd, state);
@@ -199,8 +269,14 @@ export function recordAttestation(cwd: string, attestationId: string): NucleusSt
   // Auto-advance Implementing → Attested when first real attestation lands
   if (state.phase === "Implementing") {
     state.phase = "Attested";
-    state.notes.push(`[${nowIso()}] Attested: recorded ${attestationId}`);
   }
+  state.notes = [];
+  appendAttestationHistory(cwd, {
+    changeId: state.changeId,
+    phase: state.phase,
+    attestationId,
+    note: `recorded ${attestationId}`,
+  });
   saveState(cwd, state);
   return state;
 }

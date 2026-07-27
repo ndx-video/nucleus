@@ -100,8 +100,9 @@ You should see phase, role, models, and a **Next** action.
 
 | Step | Command / tool | What happens |
 |------|----------------|--------------|
-| Draft Spec | `/spec` | Planner role; creates/edits Spec under `.nucleus/specs/` |
+| Draft Spec | `/spec` | Planner role; working Spec at `.nucleus/specs/current.md` |
 | Approve Spec | `/spec approve` | Phase → SpecApproved |
+| (after Accept) | `/spec` again | Prior Spec archived under `.nucleus/specs/archive/`; fresh `current.md` |
 | Implement | `/implement` | Implementer model + tools; Spec injected |
 | Attest | tool **`nucleus_attest`** | Harness runs your command, writes HMAC-tagged artifact |
 | Review | `/review` | Clean Reviewer session + Spec + Diff + Attest + re-exec |
@@ -230,13 +231,20 @@ Typical fields:
 
 ```text
 .nucleus/
-  state.json              # phase machine
-  specs/current.md        # default Spec
+  state.json              # hot honesty gate only (phase, role, changeId, specPath, att ids)
+  history.jsonl           # append-only phase/attestation log (rotated by size → .1 / .2)
+  specs/current.md        # working Spec for the *active* change only
+  specs/archive/          # accepted/superseded Specs (changeId + label)
   attestations/*.json     # harness captures + integrity
   attest.key              # project HMAC secret (do not commit)
   review-bundle.md        # last Review Bundle
   review-session.json     # isolation metadata
+  out/NNNN.md             # /copy-out exports
 ```
+
+**Spec rotation:** `/accept` archives the active Spec. The next `/spec` (new change) archives any leftover and writes a **fresh** `current.md` template so prior-phase Specs do not pretend to be “current.”
+
+**History:** transition notes are **not** stored in `state.json` (that array balloons and silently dropped at 50). They append to `history.jsonl`. Legacy `notes[]` migrates automatically on load.
 
 ---
 

@@ -6,6 +6,8 @@ import { join } from "node:path";
 import {
   canTransition,
   loadState,
+  normalizeReviewResult,
+  parseState,
   recordAttestation,
   StateError,
   transitionPhase,
@@ -14,6 +16,41 @@ import {
 function tmp(): string {
   return mkdtempSync(join(tmpdir(), "nucleus-state-"));
 }
+
+describe("normalizeReviewResult", () => {
+  it("accepts proper objects", () => {
+    const r = normalizeReviewResult({
+      verdict: "pass",
+      findings: ["ok"],
+      reviewedAt: "2026-01-01T00:00:00.000Z",
+    });
+    assert.equal(r?.verdict, "pass");
+    assert.deepEqual(r?.findings, ["ok"]);
+  });
+
+  it("normalizes bare string pass/fail (hand-edited state)", () => {
+    assert.equal(normalizeReviewResult("pass")?.verdict, "pass");
+    assert.equal(normalizeReviewResult("fail")?.verdict, "fail");
+    assert.equal(normalizeReviewResult("nope"), null);
+  });
+
+  it("parseState tolerates bare reviewResult string", () => {
+    const s = parseState({
+      version: 1,
+      phase: "SpecDraft",
+      role: "planner",
+      changeId: null,
+      specPath: null,
+      attestationIds: [],
+      reviewResult: "pass",
+      overrideReason: null,
+      notes: [],
+      createdAt: "t",
+      updatedAt: "t",
+    });
+    assert.equal(s.reviewResult?.verdict, "pass");
+  });
+});
 
 describe("phase transitions", () => {
   it("allows honesty loop path", () => {

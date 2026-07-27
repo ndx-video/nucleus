@@ -95,7 +95,10 @@ export interface NucleusState {
   reviewResult: ReviewResult | null;
   /** Human override reason when accepting without review pass */
   overrideReason: string | null;
-  /** Optional notes from phase transitions */
+  /**
+   * @deprecated Transition diary now lives in `.nucleus/history.jsonl`.
+   * Kept empty for backward-compatible parse; migrated on load.
+   */
   notes: string[];
   createdAt: string;
   updatedAt: string;

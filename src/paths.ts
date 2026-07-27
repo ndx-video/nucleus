@@ -18,6 +18,8 @@ export const REVIEW_SESSION_FILE = "review-session.json";
 export const REVIEW_BUNDLE_FILE = "review-bundle.md";
 /** Incrementing export of assistant responses via /copy-out */
 export const OUT_DIR = "out";
+/** Append-only phase/attestation history (rotated by size) */
+export const HISTORY_FILE = "history.jsonl";
 
 export function nucleusRoot(cwd: string): string {
   return resolve(cwd, NUCLEUS_DIR);
@@ -52,6 +54,10 @@ export function reviewBundlePath(cwd: string): string {
 
 export function outDir(cwd: string): string {
   return join(nucleusRoot(cwd), OUT_DIR);
+}
+
+export function historyPath(cwd: string): string {
+  return join(nucleusRoot(cwd), HISTORY_FILE);
 }
 
 export function projectConfigPath(cwd: string): string {

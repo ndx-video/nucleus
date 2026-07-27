@@ -5,6 +5,7 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { hasVerifiedAttestation } from "../attestation/index.ts";
 import type { LoadConfigResult } from "../config.ts";
+import { archiveOnAccept } from "../specs.ts";
 import { loadState, transitionPhase } from "../state.ts";
 
 export function registerAcceptCommand(
@@ -105,14 +106,29 @@ export function registerAcceptCommand(
         return;
       }
 
+      // Preserve accepted Spec under archive/ so current.md can rotate for the next change
+      let archived: string | null = null;
+      try {
+        archived = archiveOnAccept(ctx.cwd);
+      } catch {
+        archived = null;
+      }
+
       const msg = final.overrideReason
         ? `Accepted with HUMAN OVERRIDE: ${final.overrideReason}`
         : "Accepted after review.";
-      ctx.ui.notify(msg, "info");
+      const archiveNote = archived
+        ? `\nSpec archived → \`${archived}\`\nNext change: /spec (writes a fresh current.md)`
+        : `\nNext change: /spec (starts a new Spec draft)`;
+      ctx.ui.notify(
+        archived ? `Accepted · Spec archived` : msg,
+        "info",
+      );
       pi.sendMessage({
         customType: "nucleus-accept",
-        content: `${msg}\nPhase: Accepted · change ${final.changeId}\nOptional: /retro`,
+        content: `${msg}\nPhase: Accepted · change ${final.changeId}${archiveNote}\nOptional: /retro`,
         display: true,
+        details: { archivedSpec: archived, changeId: final.changeId },
       });
     },
   });

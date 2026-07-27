@@ -79,19 +79,27 @@ Nucleus is deliberately thin in its first versions. It prioritises the honesty c
 
 ## Current Status
 
-**Phase 0–1.2 + Phase 2.0 (Reviewer isolation) implemented; Phase 1 live-validated 2026-07-27.**
+**Phase 0 through Phase 2.0 are implemented. The three-layer honesty stack is live-validated (2026-07-27).**
+
+### Three-layer honesty stack (live-validated)
+
+| Layer | What it does | Live-validated | Results |
+|-------|----------------|----------------|---------|
+| **1. Attestation integrity (Phase 1.1)** | HMAC-SHA256 on harness-captured artifacts; marker-only / tampered forgeries rejected | **2026-07-27 — PASS** | [summary](../nucleus-test/agent-responses/02.md) · [verdict](../nucleus-test/.results/phase11/VERDICT.md) |
+| **2. Independent re-execution (Phase 1.2)** | Verified-only status/`/review` gates; harness re-runs attested commands (MATCH / MISMATCH) | **2026-07-27 — PASS** | [summary](../nucleus-test/agent-responses/03.md) · [verdict](../nucleus-test/.results/phase12/VERDICT.md) |
+| **3. Reviewer isolation (Phase 2.0)** | Clean `newSession` with only Spec + Diff + verified Attestation + re-exec (no Implementer history) | **2026-07-27 — PASS** | [summary](../nucleus-test/agent-responses/04.md) · [verdict](../nucleus-test/.results/phase20/VERDICT.md) |
+
+**Base Phase 1 loop** (Spec → Implement → Attest → Review → Accept, plus fabrication gates) was live-validated the same day: [summary](../nucleus-test/agent-responses/01.md) · [full report](../nucleus-test/.results/HONESTY_TEST_REPORT.md).
+
+Also in place:
 
 - TypeScript extension for hard enforcement (attestation, role switching, phase gates)
 - Skills for softer procedural knowledge (`skills/nucleus-spec`, `skills/retro`)
 - YAML model nomination via `nucleus.yaml`
-- Harness-owned `nucleus_attest` + HMAC integrity (1.1) + independent re-exec (1.2)
-- **Reviewer isolation (2.0):** `/review` prefers a clean `newSession` with only the Review Bundle; `/review same` forces hybrid fallback
 - Commands: `/nucleus`, `/spec`, `/implement`, `/review`, `/accept`, `/retro`
 - Develop this package *outside* a running Nucleus/Pi session that loads itself
 
-**Residual trust:** local-first HMAC + re-exec + session isolation; not remote attestation. Ambient AGENTS.md/skills may still load into the Reviewer session. See `AGENTS.md`.
-
-See `AGENTS.md` for the working contract. See `ROADMAP.md` for Phase 0/1 specs and later phases.
+**Residual trust (honest limits):** local-first only — not remote attestation. A process that can read `.nucleus/attest.key` can forge MACs; TAP non-determinism can surface as OUTPUT MISMATCH without fabrication; ambient AGENTS.md/skills may still load into an isolated Reviewer session; `/review same` is hybrid fallback. Details in `AGENTS.md` and `ROADMAP.md`.
 
 ---
 

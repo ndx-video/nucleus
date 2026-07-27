@@ -183,17 +183,37 @@ Visible via `/nucleus status`. This is a trust feature — the human always know
 5. Everything remains local-first and works with both remote and local (Ollama) models.
 6. The developer would rather use this loop than plain skills/vanilla agent for non-trivial work.
 
-**Phase 1 live validation (2026-07-27)**  
-Run against `nucleus-test` (see `nucleus-test/agent-responses/01.md` and `.results/HONESTY_TEST_REPORT.md`):
+**Phase 1 live validation (2026-07-27) — PASS**  
+Run against sibling repo `nucleus-test`:
 
-- Happy path Spec → Implement → real `nucleus_attest` → Review → Accept held.
-- `/review` blocked when no attestation existed.
-- Model nomination / role tool restrictions observed.
-- Residual leak found: hand-written JSON with only `"capturedBy": "nucleus_attest"` was accepted by the loader.
+| Artifact | Path |
+|----------|------|
+| Summary | [`../nucleus-test/agent-responses/01.md`](../nucleus-test/agent-responses/01.md) |
+| Full report | [`../nucleus-test/.results/HONESTY_TEST_REPORT.md`](../nucleus-test/.results/HONESTY_TEST_REPORT.md) |
+
+Held: happy path Spec → Implement → real `nucleus_attest` → Review → Accept; `/review` blocked without attestation; model nomination / role tools.  
+Residual found (later closed by 1.1): hand-written JSON with only `"capturedBy": "nucleus_attest"` was accepted by the loader.
+
+---
+
+## Three-layer honesty stack — live-validated (2026-07-27)
+
+The core honesty contract after Phase 1 is a **three-layer stack**. All three layers were live-validated the same day against `nucleus-test` (local Pi install of this package).
+
+| Layer | Phase | Live status | Summary | Verdict |
+|-------|-------|-------------|---------|---------|
+| **1. Attestation integrity** | 1.1 | **PASS — 2026-07-27** | [agent-responses/02.md](../nucleus-test/agent-responses/02.md) | [.results/phase11/VERDICT.md](../nucleus-test/.results/phase11/VERDICT.md) |
+| **2. Independent re-execution** | 1.2 | **PASS — 2026-07-27** | [agent-responses/03.md](../nucleus-test/agent-responses/03.md) | [.results/phase12/VERDICT.md](../nucleus-test/.results/phase12/VERDICT.md) |
+| **3. Reviewer isolation** | 2.0 | **PASS — 2026-07-27** | [agent-responses/04.md](../nucleus-test/agent-responses/04.md) | [.results/phase20/VERDICT.md](../nucleus-test/.results/phase20/VERDICT.md) |
+
+Base loop (pre-stack fabrication gates): [01.md](../nucleus-test/agent-responses/01.md) · [HONESTY_TEST_REPORT.md](../nucleus-test/.results/HONESTY_TEST_REPORT.md).
 
 ---
 
 ### Phase 1.1 — Attestation Integrity Hardening
+
+**Status:** Implemented · **Live-validated 2026-07-27 — PASS**  
+Evidence: [`../nucleus-test/agent-responses/02.md`](../nucleus-test/agent-responses/02.md) · [`../nucleus-test/.results/phase11/VERDICT.md`](../nucleus-test/.results/phase11/VERDICT.md)
 
 **Goal**  
 Close the marker-only forgery leak without expanding into Phase 2 crypto/signing infrastructure.
@@ -205,6 +225,8 @@ Close the marker-only forgery leak without expanding into Phase 2 crypto/signing
 4. `loadAttestation` verifies the MAC; reject missing/invalid integrity or tampered content.
 5. Unit tests cover real load + marker-only rejection + tamper rejection.
 
+**Live checks that held:** marker-only forgery rejected; fake MAC rejected; stdout tamper with reused MAC rejected; fresh harness att accepted.
+
 **Residual trust model**  
 Stops casual model forgery. Not cryptographic unforgeability against a malicious process with full filesystem access to `.nucleus/attest.key`. Local-first by design.
 
@@ -214,6 +236,9 @@ External keys, forked Reviewer sessions, free-text claim scanning, broader Phase
 ---
 
 ### Phase 1.2 — Independent Verification + Residual Polish
+
+**Status:** Implemented · **Live-validated 2026-07-27 — PASS**  
+Evidence: [`../nucleus-test/agent-responses/03.md`](../nucleus-test/agent-responses/03.md) · [`../nucleus-test/.results/phase12/VERDICT.md`](../nucleus-test/.results/phase12/VERDICT.md)
 
 **Goal**  
 Status and review gates must only trust integrity-verified attestations; Reviewer must independently re-execute attested commands.
@@ -228,6 +253,8 @@ Status and review gates must only trust integrity-verified attestations; Reviewe
 3. Tool `nucleus_verify` available to Reviewer for a second pass.
 4. Reviewer prompt treats `exit_mismatch` as strong FAIL evidence; `output_mismatch` as suspicious.
 
+**Live checks that held:** forged-only IDs → status `0 verified` and `/review` blocked; deterministic re-exec MATCH; exit-mismatch path treated as FAIL signal. Residual: TAP `duration_ms` can cause OUTPUT MISMATCH without fabrication (surfaced, not hidden).
+
 **Residual trust**  
 HMAC integrity + re-execution together. Still not remote attestation; flaky non-determinism can produce output_mismatch without fabrication (surfaced, not hidden).
 
@@ -237,6 +264,9 @@ Forked Reviewer sessions, free-text claim NLP, Phase 2 heavy hooks.
 ---
 
 ### Phase 2.0 — True Reviewer Isolation
+
+**Status:** Implemented · **Live-validated 2026-07-27 — PASS**  
+Evidence: [`../nucleus-test/agent-responses/04.md`](../nucleus-test/agent-responses/04.md) · [`../nucleus-test/.results/phase20/VERDICT.md`](../nucleus-test/.results/phase20/VERDICT.md)
 
 **Goal**  
 Run the Adversarial Reviewer in a clean context containing only Spec + Diff + verified Attestation(s) + independent re-execution results — no Implementer chain-of-thought or prior chat.
@@ -249,6 +279,8 @@ Run the Adversarial Reviewer in a clean context containing only Spec + Diff + ve
 
 **Preserved layers**  
 HMAC integrity (1.1), verified-only gates + re-exec (1.2), phase machine, tool restrictions (no write/edit).
+
+**Live checks that held:** distinct child session file (`isolation: new_session`); planted Implementer leak token present in parent, **absent** in child; child first message is isolation kickoff + Review Bundle only; forged gate and re-exec layers still work under isolation.
 
 **Residual limitations**
 - Ambient project system prompt resources (AGENTS.md, skills) may still load — not Implementer chat.

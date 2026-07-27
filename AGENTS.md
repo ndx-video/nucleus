@@ -79,14 +79,23 @@ Keep Specs lean. Prefer one clear markdown artifact over many files in Phase 1.
 - The Adversarial Reviewer **must** receive and inspect the attestation. It may re-run commands if suspicious.
 - Fabricating or hand-writing an attestation is a critical honesty violation.
 
+### Three-layer honesty stack (live-validated 2026-07-27)
+
+| Layer | Mechanism | Live result | Evidence |
+|-------|-----------|-------------|----------|
+| **1. Integrity** (Phase 1.1) | HMAC-SHA256 via `.nucleus/attest.key`; loader rejects marker-only / tampered artifacts | **PASS** | [`nucleus-test/agent-responses/02.md`](../nucleus-test/agent-responses/02.md), [`.results/phase11/VERDICT.md`](../nucleus-test/.results/phase11/VERDICT.md) |
+| **2. Independent re-exec** (Phase 1.2) | Verified-only counts/gates; harness re-runs attested commands; MATCH / MISMATCH in Review Bundle | **PASS** | [`nucleus-test/agent-responses/03.md`](../nucleus-test/agent-responses/03.md), [`.results/phase12/VERDICT.md`](../nucleus-test/.results/phase12/VERDICT.md) |
+| **3. Reviewer isolation** (Phase 2.0) | `/review` → clean `newSession` with Spec + Diff + verified Attestation + re-exec only | **PASS** | [`nucleus-test/agent-responses/04.md`](../nucleus-test/agent-responses/04.md), [`.results/phase20/VERDICT.md`](../nucleus-test/.results/phase20/VERDICT.md) |
+
+Base loop (Spec → Implement → Attest → Review → Accept) and early fabrication gates: **PASS** on 2026-07-27 — [`01.md`](../nucleus-test/agent-responses/01.md), [full report](../nucleus-test/.results/HONESTY_TEST_REPORT.md).
+
 ### Residual trust model (Phase 1.1–2.0)
 
-- **Stops:** casual model forgery (hand-written JSON that only sets `capturedBy: "nucleus_attest"`), content tampering after a real capture, and status/`/review` gates that trusted raw state IDs without integrity load.
+- **Stops:** casual model forgery (hand-written JSON that only sets `capturedBy: "nucleus_attest"`), content tampering after a real capture, status/`/review` gates that trusted raw state IDs without integrity load, and Implementer chat carry-over into Reviewer (when isolation succeeds).
 - **Independent verification (1.2):** `/review` re-executes attested commands by default and embeds MATCH / EXIT MISMATCH / OUTPUT MISMATCH. Reviewer tool `nucleus_verify` can re-run again. Exit mismatch is a strong FAIL signal.
 - **True Reviewer isolation (2.0):** `/review` prefers `ctx.newSession()` — a blank session that receives only the Review Bundle. Implementer chat history is not carried over. Fallback: `/review same` or automatic same-session hybrid if `newSession` is unavailable/cancelled (residual history risk — recorded in `.nucleus/review-session.json`).
 - **Does not stop:** a malicious process with full filesystem access that can read `.nucleus/attest.key` and write a matching MAC; fully non-deterministic tests that pass once and fail on re-exec (surfaced as mismatch); ambient project system context (AGENTS.md / skills) still loads into the new session (not Implementer chat, but not a vacuum).
 - This is intentional local-first design, not unforgeable remote attestation.
-- Phase 1 live-validated 2026-07-27 (`nucleus-test`); 1.1 closed marker-only forgery; 1.2 verified-only gates + re-exec; 2.0 isolated Reviewer session.
 
 ## Model Nomination
 

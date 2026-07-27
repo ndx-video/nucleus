@@ -16,6 +16,7 @@ This repository implements **Nucleus**, a local-first Pi coding agent harness fo
 
 ```
 nucleus/
+├── nucleus.code-workspace       # Multi-root VS Code/Cursor workspace (nucleus + nucleus-test)
 ├── nucleus.yaml                 # Model nomination + role config (source of truth)
 ├── .nucleus/                    # Runtime state, attestations, current phase
 │   ├── state.json               # Current change phase
@@ -26,7 +27,7 @@ nucleus/
 └── examples/
 ```
 
-Do **not** invent new top-level directories without updating this file and the relevant specs.
+Do **not** invent new top-level directories or artifacts without updating this file and the relevant specs.
 
 ## Roles & Incentives
 

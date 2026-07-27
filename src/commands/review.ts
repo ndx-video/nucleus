@@ -56,8 +56,8 @@ export function registerReviewCommand(
       if (attRequired && !hasVerified) {
         const detail =
           rawCount > 0
-            ? `Review blocked: ${rawCount} attestation id(s) in state but none pass integrity verification (forged/corrupt/missing). Produce a real nucleus_attest capture.`
-            : "Review blocked: no verified attestation. Implementer must call nucleus_attest before /review.";
+            ? `Review blocked: ${rawCount} raw id(s), 0 verified (integrity failed). Run nucleus_attest.`
+            : "Review blocked: 0 verified attestations. Run nucleus_attest, then /review.";
         ctx.ui.notify(detail, "error");
         pi.sendMessage({
           customType: "nucleus-review-blocked",
@@ -74,10 +74,13 @@ export function registerReviewCommand(
         (phase === "Implementing" && hasVerified);
 
       if (!canStartReview) {
-        ctx.ui.notify(
-          `Cannot /review from phase ${phase}. Need Attested (after nucleus_attest with verified artifact).`,
-          "error",
-        );
+        const hint =
+          phase === "SpecDraft" || phase === "SpecApproved" || phase === "idle"
+            ? "Finish /implement + nucleus_attest first."
+            : phase === "Accepted"
+              ? "Already Accepted — /spec for a new change."
+              : "Need Attested (after nucleus_attest).";
+        ctx.ui.notify(`Cannot /review in ${phase}. ${hint}`, "error");
         return;
       }
 
@@ -103,17 +106,12 @@ export function registerReviewCommand(
         reverify: true,
       });
 
+      // Warnings only when material — avoid notify spam
       if (!bundle.hasSpec) {
-        ctx.ui.notify("Warning: no Spec content found for review.", "warning");
-      }
-      if (!bundle.hasAttestation) {
-        ctx.ui.notify("Warning: no verified attestation artifacts found.", "warning");
+        ctx.ui.notify("No Spec content for review.", "warning");
       }
       if (bundle.hasVerificationMismatch) {
-        ctx.ui.notify(
-          "Independent re-execution mismatch detected — Reviewer should default to FAIL.",
-          "warning",
-        );
+        ctx.ui.notify("Re-exec MISMATCH in bundle — Reviewer should default to FAIL.", "warning");
       }
 
       let parentSession: string | null = null;
@@ -126,7 +124,6 @@ export function registerReviewCommand(
       const nextState = loadState(ctx.cwd);
       const preferIsolated = !forceSameSession && supportsNewSession(ctx);
 
-      // Write kickoff assuming preferred mode; may update to fallback
       let isolation: IsolationMode = preferIsolated
         ? "new_session"
         : "same_session_fallback";
@@ -138,27 +135,19 @@ export function registerReviewCommand(
 
       if (preferIsolated) {
         try {
-          // Capture plain strings only — do not use old pi/ctx inside withSession
           const promptText = kickoff.prompt;
           const mismatch = bundle.hasVerificationMismatch;
+          const attN = bundle.attestationIds.length;
 
           const result = await ctx.newSession({
             parentSession: parentSession ?? undefined,
             withSession: async (newCtx) => {
-              // New extension instance already ran session_start (applies reviewer role/tools).
-              // Inject ONLY the Review Bundle as the first user message.
               await newCtx.sendUserMessage(promptText);
               markKickoffDelivered(newCtx.cwd);
-              newCtx.ui.notify(
-                "Nucleus: isolated Reviewer session — Spec+Diff+Attestation+re-exec only (no Implementer history)",
-                "info",
-              );
-              if (mismatch) {
-                newCtx.ui.notify(
-                  "Independent re-execution mismatch — default to FAIL unless explained",
-                  "warning",
-                );
-              }
+              const msg = mismatch
+                ? `Reviewer (isolated) · ${attN} att · re-exec MISMATCH`
+                : `Reviewer (isolated) · ${attN} att · re-exec ok`;
+              newCtx.ui.notify(msg, mismatch ? "warning" : "info");
             },
           });
 
@@ -168,23 +157,17 @@ export function registerReviewCommand(
             await injectSameSession(pi, ctx, configResult, kickoff.prompt, isolation);
             return;
           }
-
-          // Successfully switched — old session runtime is gone; do not use old pi.
           return;
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           isolation = "same_session_fallback";
           updateIsolationMode(ctx.cwd, isolation);
-          ctx.ui.notify(
-            `Isolated newSession failed (${msg}); falling back to same-session review.`,
-            "warning",
-          );
+          ctx.ui.notify(`newSession failed (${msg}) — same-session fallback.`, "warning");
           await injectSameSession(pi, ctx, configResult, kickoff.prompt, isolation);
           return;
         }
       }
 
-      // Forced same-session or no newSession API
       await injectSameSession(pi, ctx, configResult, kickoff.prompt, isolation);
     },
   });
@@ -200,10 +183,11 @@ async function injectSameSession(
   updateIsolationMode(ctx.cwd, isolation);
   const roleResult = await applyRole(pi, ctx, "reviewer", configResult);
   ctx.ui.notify(
-    `Nucleus: ${isolation === "same_session_fallback" ? "same-session fallback" : isolation} review (hybrid isolation — residual history may remain)`,
+    roleResult.modelApplied
+      ? `Reviewer · same-session fallback (history may remain)`
+      : roleResult.message,
     "warning",
   );
-  ctx.ui.notify(roleResult.message, roleResult.modelApplied ? "info" : "warning");
   pi.sendUserMessage(prompt);
   markKickoffDelivered(ctx.cwd);
 }
@@ -217,7 +201,7 @@ async function recordVerdict(
   const state = loadState(ctx.cwd);
   if (state.phase !== "Reviewing" && state.phase !== "Attested") {
     ctx.ui.notify(
-      `Cannot record review verdict in phase ${state.phase}. Start /review first.`,
+      `Cannot /review ${verdict} in ${state.phase}. Run /review first.`,
       "error",
     );
     return;

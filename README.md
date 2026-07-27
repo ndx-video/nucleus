@@ -79,7 +79,7 @@ Nucleus is deliberately thin in its first versions. It prioritises the honesty c
 
 ## Current Status
 
-**Phase 0 through Phase 2.0 are implemented. The three-layer honesty stack is live-validated (2026-07-27).**
+**Phase 0–2.1 implemented. Three-layer honesty stack live-validated (2026-07-27). Phase 2.1 daily-use polish applied.**
 
 ### Three-layer honesty stack (live-validated)
 
@@ -106,28 +106,31 @@ Also in place:
 ## Install (Pi)
 
 ```bash
-# From a project that should use Nucleus (project-local install)
-pi install -l /absolute/path/to/nucleus
-
-# Or copy example config
+# In your project
 cp /path/to/nucleus/nucleus.config.example.yaml ./nucleus.yaml
-# Edit models.* to match providers configured in your Pi setup
+# Edit models.planner / implementer / reviewer (provider/model-id)
+
+pi install -l /absolute/path/to/nucleus
+# or: pi install git:github.com/ndx-video/nucleus
+
+pi
+/nucleus    # status: phase, role, verified att, next action
 ```
 
-Then start Pi in the project and run `/nucleus` to verify status.
+All runtime state is local under `.nucleus/` (state, specs, attestations, HMAC key). Add `.nucleus/` to `.gitignore` if you do not want it committed (especially `attest.key`).
 
 ### Honesty loop
 
 ```text
-/spec            → draft Nucleus Spec (Planner model)
-/spec approve    → SpecApproved
-/implement       → Implementer model + restricted tools
-# Implementer must call tool: nucleus_attest { command: "npm test" }
-/review          → Isolated Reviewer session (Spec+Diff+Attestation+re-exec only)
-/review same     → Force same-session hybrid (fallback / debug)
+/spec              → draft Spec (Planner)
+/spec approve      → SpecApproved
+/implement         → Implementer
+# tool: nucleus_attest { command: "npm test" }
+/review            → isolated Reviewer (Spec+Diff+Attest+re-exec)
+/review same       → hybrid fallback (debug)
 /review pass|fail
-/accept          # or /accept override <reason>
-/retro           → Socratic improvements to rules
+/accept            # or /accept override <reason>
+/retro             → optional
 ```
 
 ---

@@ -46,18 +46,12 @@ export interface ReviewKickoff {
   meta: ReviewSessionMeta;
 }
 
-const ISOLATION_HEADER = `NUCLEUS PHASE 2.0 — ISOLATED ADVERSARIAL REVIEW
+const ISOLATION_HEADER = `NUCLEUS — ISOLATED ADVERSARIAL REVIEW
 
-This is a **clean Reviewer session**. You have NO prior conversation history.
-You MUST ignore any Implementer reasoning, chain-of-thought, or helpfulness bias
-you might invent. Work ONLY from the Review Bundle below:
+Clean session: **no Implementer chat history**. Work only from the Review Bundle.
+Ignore invented narrative. Prefer FAIL on exit_mismatch.
 
-1. Spec
-2. Diff
-3. Integrity-verified attestation(s)
-4. Independent re-execution results (MATCH / EXIT MISMATCH / OUTPUT MISMATCH)
-
-Do not ask for Implementer narrative. Do not assume unstated success.
+Contents: 1 Spec · 2 Diff · 3 Verified attestations · 4 Independent re-exec (MATCH/MISMATCH)
 `;
 
 /**
@@ -65,19 +59,20 @@ Do not ask for Implementer narrative. Do not assume unstated success.
  * Contains only the harness Review Bundle + review instructions — never chat history.
  */
 export function buildIsolatedReviewPrompt(bundle: ReviewerBundle): string {
+  const mismatchNote = bundle.hasVerificationMismatch
+    ? "\n⚠ Re-exec **MISMATCH** already in §4 — default to FAIL unless explained.\n"
+    : "";
   return [
     ISOLATION_HEADER,
-    "",
+    mismatchNote,
     "--- BEGIN REVIEW BUNDLE ---",
     "",
     bundle.text,
     "",
     "--- END REVIEW BUNDLE ---",
     "",
-    "Perform the adversarial review now. Be skeptical.",
-    "Independent re-execution results are in section 4 when present.",
-    "You may call `nucleus_verify` for a second pass if needed.",
-    "When finished, the human records the outcome with `/review pass` or `/review fail <summary>`.",
+    "Review now. Be skeptical. Optional second pass: `nucleus_verify`.",
+    "Human records outcome: `/review pass` or `/review fail <summary>`.",
   ].join("\n");
 }
 

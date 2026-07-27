@@ -24,20 +24,24 @@ export function registerImplementCommand(
       if (!allowed.includes(phase)) {
         if (phase === "Attested" || phase === "Reviewing") {
           ctx.ui.notify(
-            `Phase is ${phase}. Use /review or reject first. To re-implement after reject, phase must be Rejected or SpecApproved.`,
+            `Cannot /implement in ${phase}. Use /review (or /review fail then /implement).`,
             "error",
           );
           return;
         }
+        if (phase === "Accepted") {
+          ctx.ui.notify("Change already Accepted. Start a new change with /spec.", "error");
+          return;
+        }
         ctx.ui.notify(
-          `Cannot /implement from phase ${phase}. Approve a spec first (/spec approve).`,
+          `Cannot /implement in ${phase}. Next: /spec then /spec approve.`,
           "error",
         );
         return;
       }
 
       if (!state.specPath || !existsSync(resolve(ctx.cwd, state.specPath))) {
-        ctx.ui.notify("No approved spec on disk. Run /spec and /spec approve first.", "error");
+        ctx.ui.notify("No Spec on disk. Run /spec, then /spec approve.", "error");
         return;
       }
 
@@ -76,7 +80,13 @@ export function registerImplementCommand(
         "Begin by confirming you understand the Acceptance Criteria, then implement.",
       ].join("\n");
 
-      ctx.ui.notify(roleResult.message, roleResult.modelApplied ? "info" : "warning");
+      // Quiet success: one notify + kickoff message
+      ctx.ui.notify(
+        roleResult.modelApplied
+          ? `Implementer · ${next.phase} · ${next.specPath}`
+          : roleResult.message,
+        roleResult.modelApplied ? "info" : "warning",
+      );
       pi.sendUserMessage(prompt);
     },
   });

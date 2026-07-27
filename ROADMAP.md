@@ -291,3 +291,22 @@ HMAC integrity (1.1), verified-only gates + re-exec (1.2), phase machine, tool r
 Reviewer session branch starts empty aside from the injected Review Bundle; no Implementer messages appear in session history.
 
 ---
+
+### Phase 2.1 — Daily-Use Polish (pre-release)
+
+**Status:** Implemented (no honesty-layer changes)
+
+**Goal**  
+Make the validated stack pleasant for daily work: scannable `/nucleus`, clear command errors, readable Review Bundle, install-ready package metadata and examples.
+
+**In scope**
+- Status: phase, role, verified att count + latest id, isolation mode, blocked reason, next actions
+- Command feedback: short, actionable, consistent with gates
+- Review Bundle / kickoff layout for scanability (MATCH/MISMATCH summary table)
+- Annotated `nucleus.config.example.yaml` + `examples/`
+- `package.json` `files` list for clean `pi install` / npm publish
+
+**Out of scope**  
+Multi-reviewer, auto-sizer, free-text claim scanning.
+
+---

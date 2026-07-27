@@ -20,9 +20,8 @@ export function registerAcceptCommand(
       const storePath = getConfig().config?.attestation.store_path;
       const hasVerified = hasVerifiedAttestation(ctx.cwd, storePath);
 
-      // Already accepted
       if (state.phase === "Accepted") {
-        ctx.ui.notify("Change already Accepted.", "info");
+        ctx.ui.notify("Already Accepted. /spec to start a new change.", "info");
         return;
       }
 
@@ -44,7 +43,7 @@ export function registerAcceptCommand(
           });
         } else {
           ctx.ui.notify(
-            "Review not passed. Use `/review pass`, or `/accept override <reason>` to force.",
+            "Review not passed. Use /review pass, or /accept override <reason>.",
             "error",
           );
           return;
@@ -52,7 +51,7 @@ export function registerAcceptCommand(
       } else if (state.phase === "Attested" || state.phase === "Implementing") {
         if (!isOverride) {
           ctx.ui.notify(
-            `Phase is ${state.phase}. Run /review first, or \`/accept override <reason>\`.`,
+            `Cannot /accept in ${state.phase}. Run /review, or /accept override <reason>.`,
             "error",
           );
           return;

@@ -166,10 +166,10 @@ async function handleApprove(
   }
 
   const final = loadState(ctx.cwd);
-  ctx.ui.notify(`Spec approved · ${final.specPath} · phase ${final.phase}`, "info");
+  ctx.ui.notify(`Spec approved · next: /implement`, "info");
   pi.sendMessage({
     customType: "nucleus-spec",
-    content: `Spec approved at ${final.specPath}. Phase: SpecApproved. Run /implement when ready.`,
+    content: `Spec approved (${final.specPath}). Phase: SpecApproved. Next: /implement`,
     display: true,
   });
 }

@@ -19,6 +19,18 @@
   "bugs": {
     "url": "https://github.com/ndx-video/nucleus/issues"
   },
+  "files": [
+    "src",
+    "skills",
+    "prompts",
+    "examples",
+    "nucleus.config.example.yaml",
+    "README.md",
+    "AGENTS.md",
+    "LICENSE",
+    "NOTICE",
+    "package.json"
+  ],
   "pi": {
     "extensions": [
       "./src/index.ts"
@@ -31,7 +43,7 @@
     ]
   },
   "scripts": {
-    "test": "tsx --test test/config.test.ts test/state.test.ts test/attestation.test.ts test/verify.test.ts test/isolation.test.ts",
+    "test": "tsx --test test/config.test.ts test/state.test.ts test/attestation.test.ts test/verify.test.ts test/isolation.test.ts test/status.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

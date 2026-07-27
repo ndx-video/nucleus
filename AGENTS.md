@@ -47,11 +47,12 @@ Spec (approved) → Implement → Attest (real capture) → Adversarial Review �
 
 ### Commands (when available)
 
-- `/nucleus` or `/n` — Show current honesty state / phase
+- `/nucleus` or `/n` — Scannable status: phase, role, verified attestations, isolation mode, blocked reason, **next action**
 - `/spec` — Create or refine a Nucleus Spec
+- `/spec approve` — Mark Spec approved
 - `/implement` — Hand approved Spec to Implementer
-- `/review` — Launch Adversarial Reviewer with restricted context
-- `/accept` — Mark change accepted (only after review or explicit human override)
+- `/review` — Isolated Adversarial Reviewer (`/review same` = hybrid fallback)
+- `/accept` — Mark accepted after review pass (`/accept override <reason>` for human override)
 - `/retro` — Socratic interview that writes deterministic improvements back into project rules
 
 ### Phase State

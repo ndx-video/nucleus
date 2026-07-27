@@ -52,7 +52,7 @@ export default function nucleusExtension(pi: ExtensionAPI): void {
   // ─── Session start: load config + status widget ─────────────────────
   // Phase 2.0: after ctx.newSession(), this runs on the NEW extension instance
   // BEFORE withSession injects the Review Bundle — apply Reviewer model/tools here.
-  pi.on("session_start", async (event, ctx: ExtensionContext) => {
+  pi.on("session_start", async (_event, ctx: ExtensionContext) => {
     refreshConfig(ctx.cwd);
     try {
       const state = loadState(ctx.cwd);
@@ -68,25 +68,14 @@ export default function nucleusExtension(pi: ExtensionAPI): void {
       if (isReviewSession && state.phase === "Reviewing") {
         const roleResult = await applyRole(pi, ctx, "reviewer", configResult);
         activeRole = "reviewer";
-        const iso = reviewMeta?.isolation ?? "unknown";
-        ctx.ui.notify(
-          `Nucleus Reviewer session (${iso}) · ${roleResult.message}`,
-          roleResult.modelApplied ? "info" : "warning",
-        );
-        if (event.reason === "new" || event.reason === "fork") {
-          ctx.ui.notify(
-            "Clean session: no Implementer chat history. Work only from the Review Bundle.",
-            "info",
-          );
+        // Single quiet line — withSession will notify isolation result
+        if (!roleResult.modelApplied && roleResult.modelError) {
+          ctx.ui.notify(`Reviewer model: ${roleResult.modelError}`, "warning");
         }
       } else if (configResult.error) {
         ctx.ui.notify(`Nucleus: ${configResult.error}`, "warning");
-      } else {
-        ctx.ui.notify(
-          `Nucleus loaded · phase ${state.phase} · role ${state.role}`,
-          "info",
-        );
       }
+      // Normal session_start: no toast spam — footer status is enough
 
       updateStatusUi(ctx);
     } catch (err) {

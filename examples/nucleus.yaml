@@ -1,17 +1,20 @@
-# Example project config for Nucleus.
-# Copy to the project root as nucleus.yaml and edit model names to match your Pi setup.
+# Minimal project config — copy to PROJECT_ROOT/nucleus.yaml and edit models.
+# Paths: all Nucleus runtime state lives under .nucleus/ (local-first).
 
 models:
   planner: "anthropic/claude-opus-4"
   implementer: "anthropic/claude-sonnet-4"
   reviewer: "openai/gpt-4.1"
 
-roles:
-  implementer:
-    allowed_tools: ["read", "write", "edit", "bash", "grep", "find", "ls", "nucleus_attest"]
-  reviewer:
-    allowed_tools: ["read", "bash", "grep", "find", "ls", "nucleus_verify"]
-    adversarial: true
+# Optional: leave roles out to use package defaults (implementer + nucleus_attest,
+# reviewer read-only + nucleus_verify). Uncomment to customize.
+#
+# roles:
+#   implementer:
+#     allowed_tools: [read, write, edit, bash, grep, find, ls, nucleus_attest]
+#   reviewer:
+#     allowed_tools: [read, bash, grep, find, ls, nucleus_verify]
+#     adversarial: true
 
 attestation:
   required: true

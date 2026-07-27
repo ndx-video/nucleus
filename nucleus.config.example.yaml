@@ -1,16 +1,31 @@
-# Nucleus — model nomination + role config (source of truth)
-# Copy to nucleus.yaml in your project root (or ~/.nucleus/nucleus.yaml).
+# Nucleus — honesty harness config (source of truth)
+#
+# Setup:
+#   1. Copy this file to your project root as:  nucleus.yaml
+#      (optional global: ~/.nucleus/nucleus.yaml — project wins on merge)
+#   2. Set models.* to provider/model-id values configured in your Pi setup
+#   3. pi install -l /path/to/nucleus   (or npm/git source)
+#   4. In Pi: /nucleus
+#
+# Local state (auto-created, gitignore recommended):
+#   .nucleus/state.json           — phase machine
+#   .nucleus/specs/               — Spec drafts (default current.md)
+#   .nucleus/attestations/        — harness-captured attestations
+#   .nucleus/attest.key           — project-local HMAC secret (do not commit)
+#   .nucleus/review-bundle.md     — last Review Bundle (audit)
+#   .nucleus/review-session.json  — isolation mode of last /review
 #
 # Model refs: provider/model-id
-# Examples: anthropic/claude-sonnet-4, openai/gpt-4.1, ollama/llama3.2
+# Examples: anthropic/claude-sonnet-4, openai/gpt-4.1, ollama/llama3.2, xai/grok-4
 
 models:
   planner: "anthropic/claude-opus-4"        # prefer SOTA for planning
   implementer: "anthropic/claude-sonnet-4" # mid-tier is fine
-  reviewer: "openai/gpt-4.1"               # deliberately different model recommended
+  reviewer: "openai/gpt-4.1"               # different model recommended
 
 roles:
   implementer:
+    # nucleus_attest is always injected by the harness if omitted
     allowed_tools:
       - read
       - write
@@ -21,17 +36,17 @@ roles:
       - ls
       - nucleus_attest
   reviewer:
-    # No write/edit by default — adversarial isolation
+    # No write/edit by default. nucleus_verify is always injected if omitted.
     allowed_tools:
       - read
       - bash
       - grep
       - find
       - ls
-      - nucleus_verify   # independent re-execution of attested commands
+      - nucleus_verify
     adversarial: true
 
 attestation:
-  required: true
-  store_path: ".nucleus/attestations/"
-  require_real_stdout: true
+  required: true                          # /review blocked without verified att
+  store_path: ".nucleus/attestations/"    # relative to project root
+  require_real_stdout: true               # flag empty success in capture notes

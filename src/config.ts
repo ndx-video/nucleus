@@ -265,19 +265,19 @@ function deepMerge(
 }
 
 export function defaultConfigTemplate(): string {
-  return `# Nucleus — model nomination + role config (source of truth)
-# Copy to nucleus.yaml in your project root (or ~/.nucleus/nucleus.yaml).
+  return `# Nucleus — copy to nucleus.yaml (or ~/.nucleus/nucleus.yaml).
+# Runtime: .nucleus/ (state, specs, attestations, attest.key — do not commit key)
 
 models:
-  planner: "anthropic/claude-opus-4"        # or ollama/...
+  planner: "anthropic/claude-opus-4"
   implementer: "anthropic/claude-sonnet-4"
-  reviewer: "openai/gpt-4.1"               # deliberately different model recommended
+  reviewer: "openai/gpt-4.1"
 
 roles:
   implementer:
     allowed_tools: ["read", "write", "edit", "bash", "grep", "find", "ls", "nucleus_attest"]
   reviewer:
-    allowed_tools: ["read", "bash", "grep", "find", "ls", "nucleus_verify"]  # no write; re-exec tool
+    allowed_tools: ["read", "bash", "grep", "find", "ls", "nucleus_verify"]
     adversarial: true
 
 attestation:

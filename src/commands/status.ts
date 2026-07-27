@@ -1,15 +1,23 @@
 /**
- * /nucleus and /n — show honesty state / phase.
+ * /nucleus and /n — crisp honesty status for daily use (Phase 2.1).
  */
 
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import {
   countVerifiedAttestations,
   latestVerifiedAttestationId,
 } from "../attestation/index.ts";
 import type { LoadConfigResult } from "../config.ts";
+import {
+  blockedReason,
+  phaseLabel,
+  suggestNextActions,
+  type NextActionContext,
+} from "../next-actions.ts";
 import { loadReviewSessionMeta } from "../review-isolation.ts";
-import { allowedNextPhases, formatStatus, loadState } from "../state.ts";
+import { allowedNextPhases, loadState } from "../state.ts";
 import type { StatusSnapshot } from "../types.ts";
 
 export function buildStatusSnapshot(
@@ -26,7 +34,6 @@ export function buildStatusSnapshot(
     role: state.role,
     changeId: state.changeId,
     specPath: state.specPath,
-    // Phase 1.2: only integrity-verified attestations
     attestationCount: verifiedCount,
     latestAttestationId: latestVerifiedId,
     reviewResult: state.reviewResult,
@@ -38,54 +45,104 @@ export function buildStatusSnapshot(
   };
 }
 
+function nextActionContext(
+  cwd: string,
+  configResult: LoadConfigResult,
+  verified: number,
+  raw: number,
+  specPath: string | null,
+): NextActionContext {
+  const hasSpecOnDisk = !!(specPath && existsSync(resolve(cwd, specPath)));
+  return {
+    configLoaded: !!configResult.config,
+    verifiedAttestations: verified,
+    rawAttestationIds: raw,
+    hasSpecOnDisk,
+  };
+}
+
+/**
+ * Scannable status for humans and models.
+ * Phase · role · verified att · isolation · blocked · next actions.
+ */
 export function formatFullStatus(
   cwd: string,
   configResult: LoadConfigResult,
 ): string {
   const state = loadState(cwd);
-  const snap = buildStatusSnapshot(cwd, configResult);
+  const storePath = configResult.config?.attestation.store_path;
+  const verified = countVerifiedAttestations(cwd, storePath);
+  const latest = latestVerifiedAttestationId(cwd, storePath);
+  const raw = state.attestationIds.length;
+  const actCtx = nextActionContext(cwd, configResult, verified, raw, state.specPath);
+  const blocked = blockedReason(state, actCtx);
+  const next = suggestNextActions(state, actCtx);
+  const isolation = formatIsolationBrief(cwd);
+
+  const attLine =
+    verified === 0
+      ? raw > 0
+        ? `0 verified (${raw} raw failed integrity)`
+        : "0 verified"
+      : latest
+        ? `${verified} verified · latest ${latest}`
+        : `${verified} verified`;
+
+  const reviewLine = state.reviewResult
+    ? `${state.reviewResult.verdict.toUpperCase()} · ${state.reviewResult.findings.length} finding(s)`
+    : "—";
+
   const lines = [
-    "═══ Nucleus — The Honesty Harness ═══",
-    "",
-    formatStatus(state, {
-      verifiedCount: snap.attestationCount,
-      latestVerifiedId: snap.latestAttestationId,
-      rawCount: state.attestationIds.length,
-    }),
-    "",
-    "── Config ──",
-    snap.configLoaded
-      ? [
-          `  planner:     ${snap.models?.planner}`,
-          `  implementer: ${snap.models?.implementer}`,
-          `  reviewer:    ${snap.models?.reviewer}`,
-          `  sources:     ${configResult.sources.join(", ") || "(none)"}`,
-        ].join("\n")
-      : `  ERROR: ${snap.configError}`,
-    "",
-    "── Loop ──",
-    "  Spec → Implement → Attest → Review (isolated session + re-exec) → Accept/Reject → Retro",
-    "",
-    "── Isolation ──",
-    formatIsolationLine(cwd),
-    "",
-    "── Commands ──",
-    "  /spec  /implement  /review  /review same  /accept  /retro  /nucleus",
+    "Nucleus",
+    "───────",
+    `Phase   ${phaseLabel(state.phase)}`,
+    `Role    ${state.role}`,
+    `Change  ${state.changeId ?? "—"}`,
+    `Spec    ${state.specPath ?? "—"}`,
+    `Attest  ${attLine}`,
+    `Review  ${reviewLine}`,
+    `Isol.   ${isolation}`,
   ];
+
+  if (state.overrideReason) {
+    lines.push(`Override ${state.overrideReason}`);
+  }
+
+  if (blocked) {
+    lines.push("", `⚠ ${blocked}`);
+  }
+
+  lines.push("", "Next");
+  for (const step of next) {
+    lines.push(`  · ${step}`);
+  }
+
+  if (!configResult.config) {
+    lines.push("", `Config  ERROR: ${configResult.error}`);
+  } else {
+    lines.push(
+      "",
+      "Models",
+      `  planner     ${configResult.config.models.planner}`,
+      `  implementer ${configResult.config.models.implementer}`,
+      `  reviewer    ${configResult.config.models.reviewer}`,
+    );
+  }
+
+  lines.push(
+    "",
+    "Loop  /spec → /spec approve → /implement → nucleus_attest → /review → /accept",
+  );
+
   return lines.join("\n");
 }
 
-function formatIsolationLine(cwd: string): string {
+function formatIsolationBrief(cwd: string): string {
   const meta = loadReviewSessionMeta(cwd);
-  if (!meta) {
-    return "  last review: (none yet) · default /review uses new_session isolation";
-  }
-  return [
-    `  last review: ${meta.isolation}`,
-    meta.kickoffDelivered ? "kickoff delivered" : "kickoff pending",
-    meta.verificationMismatch ? "re-exec MISMATCH" : "re-exec ok/pending",
-    meta.parentSession ? `parent=${meta.parentSession}` : "parent=(none)",
-  ].join(" · ");
+  if (!meta) return "— (default /review = new_session)";
+  const reexec = meta.verificationMismatch ? "re-exec MISMATCH" : "re-exec ok";
+  const kick = meta.kickoffDelivered ? "delivered" : "pending";
+  return `${meta.isolation} · kickoff ${kick} · ${reexec}`;
 }
 
 export function registerStatusCommands(
@@ -93,23 +150,24 @@ export function registerStatusCommands(
   getConfig: () => LoadConfigResult,
 ): void {
   const handler = async (_args: string, ctx: ExtensionCommandContext) => {
-    const text = formatFullStatus(ctx.cwd, getConfig());
-    ctx.ui.notify("Nucleus status", "info");
+    const configResult = getConfig();
+    const text = formatFullStatus(ctx.cwd, configResult);
+    // Single surface: custom message (no redundant toast spam)
     pi.sendMessage({
       customType: "nucleus-status",
       content: text,
       display: true,
-      details: buildStatusSnapshot(ctx.cwd, getConfig()),
+      details: buildStatusSnapshot(ctx.cwd, configResult),
     });
   };
 
   pi.registerCommand("nucleus", {
-    description: "Show Nucleus honesty state / current phase",
+    description: "Show honesty status: phase, role, attestations, next action",
     handler,
   });
 
   pi.registerCommand("n", {
-    description: "Alias for /nucleus — honesty state / phase",
+    description: "Alias for /nucleus",
     handler,
   });
 }

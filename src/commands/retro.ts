@@ -73,7 +73,10 @@ export function registerRetroCommand(
         "After sufficient answers, propose specific file edits. Wait for approval before writing.",
       ].join("\n");
 
-      ctx.ui.notify(roleResult.message, roleResult.modelApplied ? "info" : "warning");
+      ctx.ui.notify(
+        roleResult.modelApplied ? "Retro · Planner" : roleResult.message,
+        roleResult.modelApplied ? "info" : "warning",
+      );
       pi.sendUserMessage(prompt);
     },
   });

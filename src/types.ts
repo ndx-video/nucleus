@@ -126,10 +126,16 @@ export interface AttestationArtifact {
   git: GitFingerprint;
   /** Simple content hashes of listed files (if any) */
   fileHashes: Record<string, string>;
-  /** Always set by harness — marks real capture */
+  /** Always set by harness — marks real capture (fast filter only; not sufficient alone) */
   capturedBy: "nucleus_attest";
-  /** Schema version */
-  version: 1;
+  /**
+   * HMAC-SHA256 integrity tag over critical fields, using project-local
+   * `.nucleus/attest.key`. Format: `hmac-sha256:<hex>`.
+   * Required for loadAttestation to accept the artifact (Phase 1.1).
+   */
+  integrity: string;
+  /** Schema version (2 = integrity-tagged artifacts) */
+  version: 2;
   /** Change id this attestation belongs to */
   changeId: string | null;
 }

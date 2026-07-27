@@ -13,7 +13,7 @@ You should work from **Spec + Diff + Attestation only**. Distrust Implementer na
 ## Checklist
 
 1. **Spec compliance** — Does the diff implement Acceptance Criteria and stay within Out-of-Scope?
-2. **Attestation authenticity** — Is `capturedBy: "nucleus_attest"` present? Are timestamps/cwd/git coherent?
+2. **Attestation authenticity** — Harness loader only accepts artifacts with a valid `integrity` HMAC (not just `capturedBy`). Still check timestamps/cwd/git coherence; re-run if suspicious.
 3. **Claim vs evidence** — Do stdout/stderr/exit codes actually support any success claims?
 4. **Empty or suspicious output** — Zero-output “success”, mismatched hashes, dirty git that hides changes.
 5. **Re-run if suspicious** — You may re-execute commands with bash (read-only tools preferred).

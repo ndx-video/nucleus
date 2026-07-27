@@ -183,4 +183,32 @@ Visible via `/nucleus status`. This is a trust feature — the human always know
 5. Everything remains local-first and works with both remote and local (Ollama) models.
 6. The developer would rather use this loop than plain skills/vanilla agent for non-trivial work.
 
+**Phase 1 live validation (2026-07-27)**  
+Run against `nucleus-test` (see `nucleus-test/agent-responses/01.md` and `.results/HONESTY_TEST_REPORT.md`):
+
+- Happy path Spec → Implement → real `nucleus_attest` → Review → Accept held.
+- `/review` blocked when no attestation existed.
+- Model nomination / role tool restrictions observed.
+- Residual leak found: hand-written JSON with only `"capturedBy": "nucleus_attest"` was accepted by the loader.
+
+---
+
+### Phase 1.1 — Attestation Integrity Hardening
+
+**Goal**  
+Close the marker-only forgery leak without expanding into Phase 2 crypto/signing infrastructure.
+
+**Mechanism**
+1. Keep `capturedBy: "nucleus_attest"` as a fast first filter.
+2. Project-local secret at `.nucleus/attest.key` (created by harness on first write, mode `0600`).
+3. Artifact field `integrity: "hmac-sha256:<hex>"` over critical fields (command, exitCode, stdout/stderr, timestamp, cwd, git fingerprint, fileHashes, changeId, …).
+4. `loadAttestation` verifies the MAC; reject missing/invalid integrity or tampered content.
+5. Unit tests cover real load + marker-only rejection + tamper rejection.
+
+**Residual trust model**  
+Stops casual model forgery. Not cryptographic unforgeability against a malicious process with full filesystem access to `.nucleus/attest.key`. Local-first by design.
+
+**Out of scope for 1.1**  
+External keys, forked Reviewer sessions, free-text claim scanning, broader Phase 2.
+
 ---

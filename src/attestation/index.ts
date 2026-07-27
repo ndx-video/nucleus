@@ -1,8 +1,11 @@
 /**
  * nucleus_attest — harness-owned real execution capture.
  *
- * The model cannot forge this: the harness executes the command and writes
- * stdout/stderr/exit code/git fingerprint/file hashes to disk.
+ * The model cannot forge this casually: the harness executes the command,
+ * writes stdout/stderr/exit code/git fingerprint/file hashes, and tags the
+ * artifact with an HMAC over those fields using a project-local secret.
+ *
+ * See integrity.ts for residual trust limits (not unforgeable against full FS access).
  */
 
 import { createHash, randomBytes } from "node:crypto";
@@ -13,6 +16,12 @@ import { captureGitFingerprint } from "../git.ts";
 import { attestationsDir, ensureNucleusLayout, toProjectRelative } from "../paths.ts";
 import { ensureChangeId, loadState, recordAttestation } from "../state.ts";
 import type { AttestationArtifact, NucleusConfig } from "../types.ts";
+import {
+  ensureAttestSecret,
+  readAttestSecret,
+  signArtifact,
+  verifyArtifactIntegrity,
+} from "./integrity.ts";
 
 export interface AttestOptions {
   /** Shell command to run (passed to `sh -c`) */
@@ -134,6 +143,8 @@ export function artifactToMarkdown(a: AttestationArtifact): string {
     `- **durationMs:** ${a.durationMs}`,
     `- **changeId:** ${a.changeId ?? "(none)"}`,
     `- **capturedBy:** ${a.capturedBy}`,
+    `- **integrity:** \`${a.integrity}\``,
+    `- **version:** ${a.version}`,
     "",
     "## Git",
     "",
@@ -199,7 +210,8 @@ export async function createAttestation(
   const fileHashes = hashFiles(runCwd, options.hash_files ?? []);
 
   const id = newAttestationId();
-  const artifact: AttestationArtifact = {
+  // Build body first; sign only after any post-processing mutates stderr/etc.
+  const unsigned: Omit<AttestationArtifact, "integrity"> = {
     id,
     timestamp: new Date().toISOString(),
     cwd: runCwd,
@@ -212,22 +224,27 @@ export async function createAttestation(
     git,
     fileHashes,
     capturedBy: "nucleus_attest",
-    version: 1,
+    version: 2,
     changeId: state.changeId,
   };
 
-  // Soft check: require_real_stdout means we refuse empty success with no output
-  // when configured — still write artifact but flag in stderr note.
+  // Soft check: require_real_stdout — still write artifact but flag in stderr note.
   if (
     config?.attestation.require_real_stdout &&
     exitCode === 0 &&
     !stdout.trim() &&
     !stderr.trim()
   ) {
-    artifact.stderr =
-      (artifact.stderr ? artifact.stderr + "\n" : "") +
+    unsigned.stderr =
+      (unsigned.stderr ? unsigned.stderr + "\n" : "") +
       "[nucleus_attest] warning: command exited 0 with empty stdout/stderr (require_real_stdout)";
   }
+
+  const secret = ensureAttestSecret(projectCwd);
+  const artifact: AttestationArtifact = {
+    ...unsigned,
+    integrity: signArtifact(unsigned, secret),
+  };
 
   const dir = attestationsDir(projectCwd, storePath);
   if (!existsSync(dir)) {
@@ -243,6 +260,10 @@ export async function createAttestation(
   return { artifact, jsonPath, mdPath };
 }
 
+/**
+ * Load and verify an attestation.
+ * Rejects missing files, missing/forged capturedBy, missing integrity, or MAC failure.
+ */
 export function loadAttestation(
   projectCwd: string,
   id: string,
@@ -253,8 +274,14 @@ export function loadAttestation(
   if (!existsSync(jsonPath)) return null;
   try {
     const raw = JSON.parse(readFileSync(jsonPath, "utf-8")) as AttestationArtifact;
+    // Fast filter (still required)
     if (raw.capturedBy !== "nucleus_attest") {
-      return null; // reject hand-written forgeries missing harness marker
+      return null;
+    }
+    // Integrity required (Phase 1.1) — marker alone is not enough
+    const secret = readAttestSecret(projectCwd);
+    if (!verifyArtifactIntegrity(raw, secret)) {
+      return null;
     }
     return raw;
   } catch {
@@ -267,11 +294,8 @@ export function listAttestations(
   storePath?: string,
 ): string[] {
   const state = loadState(projectCwd);
-  // Prefer state-tracked ids; verify files exist
-  return state.attestationIds.filter((id) => {
-    const p = resolve(attestationsDir(projectCwd, storePath), `${id}.json`);
-    return existsSync(p);
-  });
+  // Prefer state-tracked ids; only count artifacts that pass integrity verification
+  return state.attestationIds.filter((id) => loadAttestation(projectCwd, id, storePath) !== null);
 }
 
 export function formatAttestationSummary(a: AttestationArtifact): string {
@@ -280,6 +304,7 @@ export function formatAttestationSummary(a: AttestationArtifact): string {
     `Attestation ${a.id} [${ok}]`,
     `  command: ${a.command}`,
     `  exitCode: ${a.exitCode}  durationMs: ${a.durationMs}`,
+    `  integrity: ${a.integrity.slice(0, 27)}… (verified on load)`,
     `  git: ${a.git.branch ?? "?"}@${(a.git.head ?? "unknown").slice(0, 8)}${a.git.dirty ? " (dirty)" : ""}`,
     `  stdout lines: ${a.stdout.split("\n").length}  stderr lines: ${a.stderr.split("\n").length}`,
   ].join("\n");

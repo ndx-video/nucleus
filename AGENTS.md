@@ -74,8 +74,15 @@ Keep Specs lean. Prefer one clear markdown artifact over many files in Phase 1.
 - Never claim that tests passed, a build succeeded, or a command produced a particular result unless a real attestation artifact exists.
 - The attestation tool is owned by the harness. It captures real stdout/stderr, exit code, timestamp, cwd, and git/status information.
 - Attestation artifacts live in `.nucleus/attestations/`.
+- Artifacts must carry a harness HMAC (`integrity: hmac-sha256:…`) keyed by project-local `.nucleus/attest.key`. The loader rejects marker-only forgeries (`capturedBy` alone is not enough).
 - The Adversarial Reviewer **must** receive and inspect the attestation. It may re-run commands if suspicious.
 - Fabricating or hand-writing an attestation is a critical honesty violation.
+
+### Residual trust model (Phase 1.1)
+
+- **Stops:** casual model forgery (hand-written JSON that only sets `capturedBy: "nucleus_attest"`), and content tampering after a real capture.
+- **Does not stop:** a malicious process with full filesystem access that can read `.nucleus/attest.key` and write a matching MAC. This is intentional local-first design, not unforgeable remote attestation.
+- Phase 1 live-validated 2026-07-27 (`nucleus-test`); integrity hardening closed the remaining marker-only leak.
 
 ## Model Nomination
 

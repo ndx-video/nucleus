@@ -6,4 +6,3 @@ dist/
 *.log
 .pi/npm/
 .pi/git/
-.results/

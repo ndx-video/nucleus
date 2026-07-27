@@ -310,3 +310,22 @@ Make the validated stack pleasant for daily work: scannable `/nucleus`, clear co
 Multi-reviewer, auto-sizer, free-text claim scanning.
 
 ---
+
+### Pre-release — One-liner install + primary docs
+
+**Status:** Implemented
+
+**Install (Pi package sources)**  
+Pi supports `npm:`, `git:`, and local paths. The npm name `nucleus` is **taken** by an unrelated package, so a bare `pi install nucleus` is **not** correct.
+
+| Command | Status |
+|---------|--------|
+| `pi install git:github.com/ndx-video/nucleus` | **Preferred one-liner** |
+| `pi install -l git:github.com/ndx-video/nucleus` | Project-local |
+| `pi install npm:@ndx-video/nucleus` | Future — after scoped npm publish |
+
+**Docs**  
+Single primary page: [`docs/index.md`](./docs/index.md) (install, config, loop, three layers, 60s walkthrough, troubleshooting).  
+README points at the one-liner + docs; AGENTS.md links the same for agents.
+
+---

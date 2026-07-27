@@ -24,6 +24,7 @@
     "skills",
     "prompts",
     "examples",
+    "docs",
     "nucleus.config.example.yaml",
     "README.md",
     "AGENTS.md",

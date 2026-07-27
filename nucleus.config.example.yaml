@@ -1,10 +1,13 @@
 # Nucleus — honesty harness config (source of truth)
 #
+# Docs: docs/index.md
+#
 # Setup:
-#   1. Copy this file to your project root as:  nucleus.yaml
+#   1. Install:  pi install git:github.com/ndx-video/nucleus
+#      (project-local: pi install -l git:github.com/ndx-video/nucleus)
+#   2. Copy this file to your project root as:  nucleus.yaml
 #      (optional global: ~/.nucleus/nucleus.yaml — project wins on merge)
-#   2. Set models.* to provider/model-id values configured in your Pi setup
-#   3. pi install -l /path/to/nucleus   (or npm/git source)
+#   3. Set models.* to provider/model-id values configured in your Pi setup
 #   4. In Pi: /nucleus
 #
 # Local state (auto-created, gitignore recommended):

@@ -2,174 +2,104 @@
 
 **The Honesty Harness**
 
-**Official site:** [https://nucleuspi.dev](https://nucleuspi.dev)
-
 > Agents can lie. Nucleus makes lying hard and detection automatic.
 
-Nucleus by NDX Pty Ltd is a local-first coding agent harness built on [Pi](https://pi.dev). Its primary purpose is to restore trust in generative coding.
+Local-first coding agent package for [Pi](https://pi.dev). Restores trust in generative coding through Specs, harness-owned attestation, independent re-execution, and isolated adversarial review.
 
-This repository is the open-source project source. Product information,
-documentation, and project news live on the official site.
-
-## Source & community
-
-| | |
-|--|--|
-| **Website** | [nucleuspi.dev](https://nucleuspi.dev) |
-| **Source** | [github.com/ndx-video/nucleus](https://github.com/ndx-video/nucleus) |
-| **Contributing** | [CONTRIBUTING.md](./CONTRIBUTING.md) |
-
-Most agent workflows optimize for speed and autonomy. Nucleus optimizes for **verifiability**. It treats the tendency of language models to fabricate results, claim tests passed when they did not, or drift from the original intent as a first-class engineering problem rather than an inconvenience.
+**Docs (start here):** [docs/index.md](./docs/index.md) · **Site:** [nucleuspi.dev](https://nucleuspi.dev) · **Source:** [github.com/ndx-video/nucleus](https://github.com/ndx-video/nucleus)
 
 ---
 
-## The Problem
+## Install (one-liner)
 
-When agents write code, two failure modes destroy trust:
-
-1. **Fabrication** — The agent claims it ran tests, checked edge cases, or verified behaviour when it did not.
-2. **Scope drift** — The agent expands, invents, or “improves” beyond what was actually requested, often without clear signal.
-
-Once trust is lost, developers stop relying on the agent for anything consequential. Productivity gains evaporate.
-
-Nucleus attacks both problems directly.
-
----
-
-## Core Idea
-
-Nucleus enforces a disciplined loop:
-
-```
-Spec → Implement → Attest (real execution capture) → Adversarial Review → Accept / Reject → Retro
-```
-
-Key mechanisms:
-
-- **Structured Specs first** — Non-trivial work begins with a clear, testable Nucleus Spec.
-- **Forced attestation** — Claims about tests, builds, or commands must be backed by a real harness-captured artifact (stdout, exit code, environment fingerprint). The model cannot simply assert success.
-- **Adversarial Review** — A separate role (preferably a different model with restricted context) actively looks for fabrication, missing evidence, and Spec violations.
-- **Visible state** — The current phase of any change is explicit. The human always knows where the honesty gate sits.
-- **Model nomination** — You decide which model plays Planner, Implementer, and Reviewer. Local models (Ollama etc.) are first-class.
-
-The result is not a more autonomous agent. It is a more *honest* one.
-
----
-
-## Who It Is For
-
-- Solo developers who want agent assistance without surrendering trust in the codebase
-- Engineers who have been burned by fabricated test results or silent scope creep
-- Anyone building serious software with coding agents and who values verifiability over raw generation speed
-
-Nucleus is deliberately thin in its first versions. It prioritises the honesty contract over feature completeness.
-
----
-
-## Design Principles
-
-1. **Honesty over cleverness**
-2. **Spec before code**
-3. **Attestation must be hard to fake**
-4. **Role separation with different incentives**
-5. **Local-first** — all state and artifacts live on disk; models can be remote or fully local
-6. **Human remains the authority**
-
----
-
-## Current Status
-
-**Phase 0–2.1 implemented. Three-layer honesty stack live-validated (2026-07-27). Phase 2.1 daily-use polish applied.**
-
-### Three-layer honesty stack (live-validated)
-
-| Layer | What it does | Live-validated | Results |
-|-------|----------------|----------------|---------|
-| **1. Attestation integrity (Phase 1.1)** | HMAC-SHA256 on harness-captured artifacts; marker-only / tampered forgeries rejected | **2026-07-27 — PASS** | [summary](../nucleus-test/agent-responses/02.md) · [verdict](../nucleus-test/.results/phase11/VERDICT.md) |
-| **2. Independent re-execution (Phase 1.2)** | Verified-only status/`/review` gates; harness re-runs attested commands (MATCH / MISMATCH) | **2026-07-27 — PASS** | [summary](../nucleus-test/agent-responses/03.md) · [verdict](../nucleus-test/.results/phase12/VERDICT.md) |
-| **3. Reviewer isolation (Phase 2.0)** | Clean `newSession` with only Spec + Diff + verified Attestation + re-exec (no Implementer history) | **2026-07-27 — PASS** | [summary](../nucleus-test/agent-responses/04.md) · [verdict](../nucleus-test/.results/phase20/VERDICT.md) |
-
-**Base Phase 1 loop** (Spec → Implement → Attest → Review → Accept, plus fabrication gates) was live-validated the same day: [summary](../nucleus-test/agent-responses/01.md) · [full report](../nucleus-test/.results/HONESTY_TEST_REPORT.md).
-
-Also in place:
-
-- TypeScript extension for hard enforcement (attestation, role switching, phase gates)
-- Skills for softer procedural knowledge (`skills/nucleus-spec`, `skills/retro`)
-- YAML model nomination via `nucleus.yaml`
-- Commands: `/nucleus`, `/spec`, `/implement`, `/review`, `/accept`, `/retro`
-- Develop this package *outside* a running Nucleus/Pi session that loads itself
-
-**Residual trust (honest limits):** local-first only — not remote attestation. A process that can read `.nucleus/attest.key` can forge MACs; TAP non-determinism can surface as OUTPUT MISMATCH without fabrication; ambient AGENTS.md/skills may still load into an isolated Reviewer session; `/review same` is hybrid fallback. Details in `AGENTS.md` and `ROADMAP.md`.
-
----
-
-## Install (Pi)
+**Prerequisite:** Pi on your PATH.
 
 ```bash
-# In your project
-cp /path/to/nucleus/nucleus.config.example.yaml ./nucleus.yaml
-# Edit models.planner / implementer / reviewer (provider/model-id)
+pi install git:github.com/ndx-video/nucleus
+```
 
-pi install -l /absolute/path/to/nucleus
-# or: pi install git:github.com/ndx-video/nucleus
+Project-local (writes `.pi/settings.json`):
+
+```bash
+pi install -l git:github.com/ndx-video/nucleus
+```
+
+Then in your project:
+
+```bash
+# copy example config (from clone, or from the installed package tree)
+cp nucleus.config.example.yaml ./nucleus.yaml   # if you have a clone
+# edit models.planner / implementer / reviewer  (provider/model-id)
 
 pi
-/nucleus    # status: phase, role, verified att, next action
+/nucleus
 ```
 
-All runtime state is local under `.nucleus/` (state, specs, attestations, HMAC key). Add `.nucleus/` to `.gitignore` if you do not want it committed (especially `attest.key`).
+| Form | Works? | Notes |
+|------|--------|--------|
+| `pi install git:github.com/ndx-video/nucleus` | **Yes — preferred** | Git install; runs `npm install` for `yaml` |
+| `pi install https://github.com/ndx-video/nucleus` | Yes | Same source |
+| `pi install -l /path/to/clone` | Yes | Local development |
+| `pi install nucleus` | **No** | npm name `nucleus` is an unrelated package |
+| `pi install npm:@ndx-video/nucleus` | Not yet | Publish scoped package for a registry one-liner |
 
-### Honesty loop
+Full walkthrough: **[docs/index.md](./docs/index.md)**.
+
+---
+
+## Honesty loop
 
 ```text
-/spec              → draft Spec (Planner)
-/spec approve      → SpecApproved
-/implement         → Implementer
-# tool: nucleus_attest { command: "npm test" }
-/review            → isolated Reviewer (Spec+Diff+Attest+re-exec)
-/review same       → hybrid fallback (debug)
-/review pass|fail
-/accept            # or /accept override <reason>
-/retro             → optional
+/spec → /spec approve → /implement
+  → tool: nucleus_attest { command: "npm test" }
+  → /review → /review pass|fail → /accept
+  → /retro (optional)
 ```
+
+`/nucleus` (or `/n`) — phase, verified attestations, blocked reason, **next action**.
 
 ---
 
-## High-Level Architecture
+## Three-layer honesty stack (live-validated 2026-07-27)
 
-```
-Human / Planner
-      ↓
-Nucleus Spec (approved)
-      ↓
-Implementer (restricted tools + nominated model)
-      ↓
-Attestation (harness captures real command output)
-      ↓
-Adversarial Reviewer (clean context: Spec + Diff + Attestation)
-      ↓
-Accept or Reject
-      ↓
-Retro (Socratic improvement of the rules themselves)
-```
+| Layer | Guarantee |
+|-------|-----------|
+| **1. HMAC integrity** | Harness-signed attestations; marker-only forgeries rejected |
+| **2. Independent re-exec** | `/review` re-runs commands; MATCH / MISMATCH in the bundle |
+| **3. Reviewer isolation** | Clean session: Spec + Diff + Attest + re-exec only |
+
+Residual limits (local-first, ambient AGENTS.md/skills, human records final pass): see [docs](./docs/index.md#5-three-honesty-layers-and-residual-limits).
+
+Evidence: sibling `nucleus-test` results linked from [ROADMAP.md](./ROADMAP.md).
 
 ---
 
-## Philosophy
+## Design principles
 
-Coding was never the real bottleneck. Trust is.
+1. Honesty over cleverness  
+2. Spec before code  
+3. Attestation must be hard to fake  
+4. Role separation with different incentives  
+5. Local-first  
+6. Human remains the authority  
 
-Nucleus exists to make the cost of dishonesty high and the path of verifiable work the path of least resistance.
+---
+
+## Package layout
+
+```text
+src/          # Pi extension (hard enforcement)
+skills/       # Spec + retro soft procedures
+prompts/      # Role prompts
+docs/         # Primary user/agent docs
+examples/     # Minimal nucleus.yaml
+nucleus.config.example.yaml
+```
+
+Develop this package **outside** a running Nucleus/Pi session that loads itself (see [AGENTS.md](./AGENTS.md)).
 
 ---
 
 ## License
 
-**Nucleus by NDX Pty Ltd** is licensed under the **Apache License, Version 2.0**.
-See [LICENSE](./LICENSE) and [NOTICE](./NOTICE).
-
-Copyright 2026 NDX Pty Ltd and contributors.
-
-You are free to use, modify, and redistribute Nucleus — including in commercial
-and internal products — under those terms. Contributions are welcome under the
-same license; see [CONTRIBUTING.md](./CONTRIBUTING.md).
+Apache-2.0 — see [LICENSE](./LICENSE) and [NOTICE](./NOTICE).

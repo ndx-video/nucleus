@@ -4,6 +4,10 @@
 
 This repository implements **Nucleus**, a local-first Pi coding agent harness focused on restoring trust in generative coding through structured specs, forced attestation of real execution, and adversarial review.
 
+**User/agent docs (install + loop):** [docs/index.md](./docs/index.md)  
+**Install one-liner:** `pi install git:github.com/ndx-video/nucleus`  
+(Do not use `pi install nucleus` — that npm name is unrelated.)
+
 ## Core Principles
 
 1. **Honesty over cleverness** — Prefer verifiable claims over confident statements. If something was not actually run, do not claim it was.
@@ -16,15 +20,16 @@ This repository implements **Nucleus**, a local-first Pi coding agent harness fo
 
 ```
 nucleus/
-├── nucleus.code-workspace       # Multi-root VS Code/Cursor workspace (nucleus + nucleus-test)
-├── nucleus.yaml                 # Model nomination + role config (source of truth)
+├── docs/index.md                # Primary install + honesty-loop docs (users & agents)
+├── nucleus.config.example.yaml  # Annotated config template
+├── nucleus.yaml                 # Optional project config when developing this repo
 ├── .nucleus/                    # Runtime state, attestations, current phase
-│   ├── state.json               # Current change phase
-│   └── attestations/            # Real execution artifacts
-├── src/                         # TypeScript extensions (hard enforcement)
+│   ├── state.json
+│   └── attestations/
+├── src/                         # TypeScript extension (hard enforcement)
 ├── skills/                      # Soft procedural knowledge (templates, retro)
 ├── prompts/                     # Role system prompts
-└── examples/
+└── examples/                    # Minimal nucleus.yaml
 ```
 
 Do **not** invent new top-level directories or artifacts without updating this file and the relevant specs.

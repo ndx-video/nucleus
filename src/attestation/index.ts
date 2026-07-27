@@ -11,17 +11,19 @@
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { spawn } from "node:child_process";
 import { captureGitFingerprint } from "../git.ts";
 import { attestationsDir, ensureNucleusLayout, toProjectRelative } from "../paths.ts";
 import { ensureChangeId, loadState, recordAttestation } from "../state.ts";
 import type { AttestationArtifact, NucleusConfig } from "../types.ts";
+import { runCommand } from "./exec.ts";
 import {
   ensureAttestSecret,
   readAttestSecret,
   signArtifact,
   verifyArtifactIntegrity,
 } from "./integrity.ts";
+
+export { runCommand } from "./exec.ts";
 
 export interface AttestOptions {
   /** Shell command to run (passed to `sh -c`) */
@@ -67,58 +69,6 @@ export function hashFiles(cwd: string, paths: string[]): Record<string, string> 
     out[rel] = hash ?? "(missing)";
   }
   return out;
-}
-
-export function runCommand(
-  command: string,
-  cwd: string,
-  timeoutMs: number,
-): Promise<{ stdout: string; stderr: string; exitCode: number; durationMs: number }> {
-  return new Promise((resolvePromise) => {
-    const started = Date.now();
-    const child = spawn("sh", ["-c", command], {
-      cwd,
-      env: process.env,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-
-    const finish = (exitCode: number) => {
-      if (settled) return;
-      settled = true;
-      resolvePromise({
-        stdout,
-        stderr,
-        exitCode,
-        durationMs: Date.now() - started,
-      });
-    };
-
-    const timer = setTimeout(() => {
-      child.kill("SIGKILL");
-      stderr += `\n[nucleus_attest] killed after ${timeoutMs}ms timeout`;
-      finish(124);
-    }, timeoutMs);
-
-    child.stdout?.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString("utf-8");
-    });
-    child.stderr?.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf-8");
-    });
-    child.on("error", (err) => {
-      clearTimeout(timer);
-      stderr += `\n[nucleus_attest] spawn error: ${err.message}`;
-      finish(127);
-    });
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      finish(code ?? 1);
-    });
-  });
 }
 
 const MAX_CAPTURE_CHARS = 200_000;
@@ -204,6 +154,7 @@ export async function createAttestation(
     options.command,
     runCwd,
     timeout,
+    "nucleus_attest",
   );
 
   const git = captureGitFingerprint(runCwd);
@@ -289,13 +240,52 @@ export function loadAttestation(
   }
 }
 
+/**
+ * State-tracked attestation IDs that still load with a valid integrity MAC.
+ * Raw state.attestationIds alone is not trustworthy for gates or status counts.
+ */
 export function listAttestations(
   projectCwd: string,
   storePath?: string,
 ): string[] {
   const state = loadState(projectCwd);
-  // Prefer state-tracked ids; only count artifacts that pass integrity verification
   return state.attestationIds.filter((id) => loadAttestation(projectCwd, id, storePath) !== null);
+}
+
+/** Load every integrity-verified attestation for the current change (order preserved). */
+export function getVerifiedAttestations(
+  projectCwd: string,
+  storePath?: string,
+): AttestationArtifact[] {
+  const out: AttestationArtifact[] = [];
+  for (const id of listAttestations(projectCwd, storePath)) {
+    const a = loadAttestation(projectCwd, id, storePath);
+    if (a) out.push(a);
+  }
+  return out;
+}
+
+export function countVerifiedAttestations(
+  projectCwd: string,
+  storePath?: string,
+): number {
+  return listAttestations(projectCwd, storePath).length;
+}
+
+export function hasVerifiedAttestation(
+  projectCwd: string,
+  storePath?: string,
+): boolean {
+  return countVerifiedAttestations(projectCwd, storePath) > 0;
+}
+
+/** Latest verified id, or null. */
+export function latestVerifiedAttestationId(
+  projectCwd: string,
+  storePath?: string,
+): string | null {
+  const ids = listAttestations(projectCwd, storePath);
+  return ids.length > 0 ? ids[ids.length - 1]! : null;
 }
 
 export function formatAttestationSummary(a: AttestationArtifact): string {

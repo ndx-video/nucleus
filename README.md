@@ -66,18 +66,18 @@ Nucleus is deliberately thin in its first versions. It prioritises the honesty c
 
 ## Current Status
 
-**Phase 0 + Phase 1 implemented; Phase 1 live-validated 2026-07-27; Phase 1.1 integrity hardening applied.**
+**Phase 0 + Phase 1 implemented; live-validated 2026-07-27; Phase 1.1 integrity + Phase 1.2 independent re-exec applied.**
 
 - TypeScript extension for hard enforcement (attestation, role switching, phase gates)
 - Skills for softer procedural knowledge (`skills/nucleus-spec`, `skills/retro`)
 - YAML model nomination via `nucleus.yaml`
 - Harness-owned `nucleus_attest` tool writing real artifacts under `.nucleus/attestations/`
-- **Attestation integrity (1.1):** HMAC-SHA256 over critical fields with project-local `.nucleus/attest.key` — marker-only forgeries are rejected
+- **Integrity (1.1):** HMAC-SHA256 + `.nucleus/attest.key` — marker-only forgeries rejected
+- **Independent verify (1.2):** `/review` re-executes attested commands by default; `nucleus_verify` tool; status/`/review` gates count only verified artifacts
 - Commands: `/nucleus`, `/spec`, `/implement`, `/review`, `/accept`, `/retro`
-- Live honesty test (2026-07-27): happy path held; `/review` blocked without attestation; remaining marker-only leak closed in 1.1
 - Develop this package *outside* a running Nucleus/Pi session that loads itself
 
-**Residual trust:** integrity tags stop casual model forgery, not a process that can read the local attest key. See `AGENTS.md`.
+**Residual trust:** stops casual model forgery and trusts re-execution mismatches as FAIL signals; not unforgeable against full local FS access to the attest key. See `AGENTS.md`.
 
 See `AGENTS.md` for the working contract. See `ROADMAP.md` for Phase 0/1 specs and later phases.
 

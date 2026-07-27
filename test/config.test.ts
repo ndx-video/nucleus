@@ -40,6 +40,7 @@ describe("validateConfig", () => {
     assert.equal(c.models.planner, "a/b");
     assert.equal(c.attestation.required, true);
     assert.ok(c.roles.implementer.allowed_tools?.includes("nucleus_attest"));
+    assert.ok(c.roles.reviewer.allowed_tools?.includes("nucleus_verify"));
     assert.equal(c.roles.reviewer.adversarial, true);
   });
 
@@ -56,6 +57,21 @@ describe("validateConfig", () => {
     });
     assert.ok(c.roles.implementer.allowed_tools?.includes("nucleus_attest"));
     assert.ok(c.roles.implementer.allowed_tools?.includes("read"));
+  });
+
+  it("injects nucleus_verify into reviewer tools", () => {
+    const c = validateConfig({
+      models: {
+        planner: "a/b",
+        implementer: "c/d",
+        reviewer: "e/f",
+      },
+      roles: {
+        reviewer: { allowed_tools: ["read", "bash"] },
+      },
+    });
+    assert.ok(c.roles.reviewer.allowed_tools?.includes("nucleus_verify"));
+    assert.ok(c.roles.reviewer.allowed_tools?.includes("read"));
   });
 
   it("rejects missing models", () => {

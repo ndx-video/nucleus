@@ -214,13 +214,46 @@ export function ensureChangeId(cwd: string): NucleusState {
   return state;
 }
 
-export function formatStatus(state: NucleusState): string {
+export interface FormatStatusOptions {
+  /** Integrity-verified attestation count (Phase 1.2 — preferred for display) */
+  verifiedCount?: number;
+  /** Latest integrity-verified id */
+  latestVerifiedId?: string | null;
+  /** Raw ids in state (may include invalid/forged); for honesty gap display */
+  rawCount?: number;
+}
+
+export function formatStatus(state: NucleusState, opts?: FormatStatusOptions): string {
+  const verified =
+    opts?.verifiedCount !== undefined ? opts.verifiedCount : null;
+  const latest =
+    opts?.latestVerifiedId !== undefined
+      ? opts.latestVerifiedId
+      : state.attestationIds.length
+        ? state.attestationIds[state.attestationIds.length - 1]
+        : null;
+  const raw = opts?.rawCount ?? state.attestationIds.length;
+
+  let attLine: string;
+  if (verified === null) {
+    // Fallback when caller has not resolved verified set (tests / early boot)
+    attLine = `Attestations: ${raw}${latest ? ` [${latest}]` : ""} (raw ids — verify on load)`;
+  } else if (verified === 0) {
+    attLine =
+      raw > 0
+        ? `Attestations: 0 verified (${raw} raw id(s) failed integrity)`
+        : `Attestations: 0 verified`;
+  } else {
+    const gap = raw > verified ? ` (${raw} raw)` : "";
+    attLine = `Attestations: ${verified} verified${latest ? ` [${latest}]` : ""}${gap}`;
+  }
+
   const lines = [
     `Phase:        ${state.phase}`,
     `Role:         ${state.role}`,
     `Change:       ${state.changeId ?? "(none)"}`,
     `Spec:         ${state.specPath ?? "(none)"}`,
-    `Attestations: ${state.attestationIds.length}${state.attestationIds.length ? ` [${state.attestationIds[state.attestationIds.length - 1]}]` : ""}`,
+    attLine,
     `Review:       ${state.reviewResult ? `${state.reviewResult.verdict} (${state.reviewResult.findings.length} findings)` : "(none)"}`,
     `Override:     ${state.overrideReason ?? "(none)"}`,
     `Updated:      ${state.updatedAt}`,

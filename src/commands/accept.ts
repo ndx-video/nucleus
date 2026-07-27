@@ -3,12 +3,13 @@
  */
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { hasVerifiedAttestation } from "../attestation/index.ts";
 import type { LoadConfigResult } from "../config.ts";
 import { loadState, transitionPhase } from "../state.ts";
 
 export function registerAcceptCommand(
   pi: ExtensionAPI,
-  _getConfig: () => LoadConfigResult,
+  getConfig: () => LoadConfigResult,
 ): void {
   pi.registerCommand("accept", {
     description:
@@ -16,6 +17,8 @@ export function registerAcceptCommand(
     handler: async (args, ctx: ExtensionCommandContext) => {
       const trimmed = (args ?? "").trim();
       const state = loadState(ctx.cwd);
+      const storePath = getConfig().config?.attestation.store_path;
+      const hasVerified = hasVerifiedAttestation(ctx.cwd, storePath);
 
       // Already accepted
       if (state.phase === "Accepted") {
@@ -56,7 +59,7 @@ export function registerAcceptCommand(
         }
         // Must go Attested → Reviewing → Accepted for legal transitions,
         // or we allow override path only from Reviewing. Force through Reviewing.
-        if (state.phase === "Implementing" && state.attestationIds.length > 0) {
+        if (state.phase === "Implementing" && hasVerified) {
           transitionPhase(ctx.cwd, "Attested", { note: "override path" });
         }
         let s = loadState(ctx.cwd);

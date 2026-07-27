@@ -8,9 +8,15 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import {
+  countVerifiedAttestations,
   createAttestation,
   formatAttestationSummary,
+  latestVerifiedAttestationId,
 } from "./attestation/index.ts";
+import {
+  formatVerificationSummary,
+  reexecuteAttestation,
+} from "./attestation/verify.ts";
 import { registerAcceptCommand } from "./commands/accept.ts";
 import { registerImplementCommand } from "./commands/implement.ts";
 import { registerReviewCommand } from "./commands/review.ts";
@@ -96,10 +102,12 @@ export default function nucleusExtension(pi: ExtensionAPI): void {
         };
       }
 
+      // Always allow nucleus_verify for independent re-execution
+      if (event.toolName === "nucleus_verify") return;
+
       // Also honor configured allow-list if present
       const allowed = configResult.config?.roles.reviewer.allowed_tools;
       if (allowed && allowed.length > 0 && !allowed.includes(event.toolName)) {
-        // Allow nucleus tools? none for reviewer
         return {
           block: true,
           reason: `Nucleus: tool "${event.toolName}" not in reviewer allowed_tools`,
@@ -113,7 +121,7 @@ export default function nucleusExtension(pi: ExtensionAPI): void {
 
   // Keep footer status in sync when tools finish (phase may advance via attest)
   pi.on("tool_execution_end", async (event, ctx: ExtensionContext) => {
-    if (event.toolName === "nucleus_attest") {
+    if (event.toolName === "nucleus_attest" || event.toolName === "nucleus_verify") {
       updateStatusUi(ctx);
     }
   });
@@ -199,6 +207,99 @@ export default function nucleusExtension(pi: ExtensionAPI): void {
     },
   });
 
+  // ─── nucleus_verify — independent re-execution (Phase 1.2) ───────────
+  pi.registerTool({
+    name: "nucleus_verify",
+    label: "Nucleus Verify",
+    description:
+      "Independently re-execute the command recorded in a verified attestation and compare exit code/stdout/stderr. " +
+      "Used by the Adversarial Reviewer. exit_mismatch is strong FAIL evidence. " +
+      "If attestation_id is omitted, uses the latest integrity-verified attestation.",
+    parameters: Type.Object({
+      attestation_id: Type.Optional(
+        Type.String({
+          description: "Attestation id to re-execute (default: latest verified)",
+        }),
+      ),
+      timeout_ms: Type.Optional(
+        Type.Number({ description: "Timeout in milliseconds (default 120000)" }),
+      ),
+    }),
+    async execute(_toolCallId, params, _signal, onUpdate, ctx) {
+      refreshConfig(ctx.cwd);
+      const storePath = configResult.config?.attestation.store_path;
+      const id =
+        params.attestation_id?.trim() ||
+        latestVerifiedAttestationId(ctx.cwd, storePath);
+
+      if (!id) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "nucleus_verify failed: no verified attestation available. Run nucleus_attest first.",
+            },
+          ],
+          details: { error: "no_verified_attestation" },
+        };
+      }
+
+      onUpdate?.({
+        content: [{ type: "text", text: `Re-executing attestation ${id}…` }],
+        details: { phase: "running", attestationId: id },
+      });
+
+      try {
+        const result = await reexecuteAttestation(ctx.cwd, id, {
+          storePath,
+          timeout_ms: params.timeout_ms,
+        });
+        if (!result) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `nucleus_verify failed: attestation ${id} missing or failed integrity verification.`,
+              },
+            ],
+            details: { error: "invalid_attestation", attestationId: id },
+          };
+        }
+
+        const text = [
+          formatVerificationSummary(result),
+          "",
+          result.verdict === "exit_mismatch"
+            ? "STRONG FAIL SIGNAL: exit codes do not match. Prefer Reviewer FAIL."
+            : result.verdict === "output_mismatch"
+              ? "SUSPICIOUS: exit matched but output differs. Investigate before PASS."
+              : "Re-execution matched attested results. Still check Spec compliance.",
+        ].join("\n");
+
+        updateStatusUi(ctx);
+
+        return {
+          content: [{ type: "text", text }],
+          details: {
+            attestationId: result.attestationId,
+            verdict: result.verdict,
+            exitCodeMatch: result.exitCodeMatch,
+            stdoutMatch: result.stdoutMatch,
+            stderrMatch: result.stderrMatch,
+            originalExitCode: result.original.exitCode,
+            reexecExitCode: result.reexec.exitCode,
+          },
+        };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: "text", text: `nucleus_verify failed: ${msg}` }],
+          details: { error: msg },
+        };
+      }
+    },
+  });
+
   // ─── Commands ───────────────────────────────────────────────────────
   registerStatusCommands(pi, getConfig);
   registerSpecCommand(pi, getConfig);
@@ -211,10 +312,9 @@ export default function nucleusExtension(pi: ExtensionAPI): void {
     try {
       const state = loadState(ctx.cwd);
       activeRole = state.role;
-      const att =
-        state.attestationIds.length > 0
-          ? ` · att:${state.attestationIds.length}`
-          : "";
+      const storePath = configResult.config?.attestation.store_path;
+      const verified = countVerifiedAttestations(ctx.cwd, storePath);
+      const att = verified > 0 ? ` · att:${verified}` : "";
       const label = `Nuc:${state.phase}/${state.role}${att}`;
       ctx.ui.setStatus("nucleus", label);
     } catch {

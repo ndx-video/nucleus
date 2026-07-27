@@ -1,8 +1,13 @@
 /**
- * /review — launch Adversarial Reviewer with Spec + Diff + Attestation only.
+ * /review — launch Adversarial Reviewer with Spec + Diff + verified Attestation
+ * + independent re-execution (Phase 1.2).
  */
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import {
+  countVerifiedAttestations,
+  hasVerifiedAttestation,
+} from "../attestation/index.ts";
 import type { LoadConfigResult } from "../config.ts";
 import { buildReviewerContext } from "../context.ts";
 import { applyRole } from "../roles/index.ts";
@@ -15,32 +20,35 @@ export function registerReviewCommand(
 ): void {
   pi.registerCommand("review", {
     description:
-      "Adversarial review (Spec+Diff+Attestation). Args: pass | fail [findings...] | (none = start review)",
+      "Adversarial review (Spec+Diff+verified Attestation+re-exec). Args: pass | fail [findings...] | (none = start review)",
     handler: async (args, ctx: ExtensionCommandContext) => {
       const configResult = getConfig();
       const trimmed = (args ?? "").trim();
       const parts = trimmed.split(/\s+/).filter(Boolean);
       const sub = parts[0]?.toLowerCase();
 
-      // Record verdict: /review pass | /review fail ...
       if (sub === "pass" || sub === "fail") {
         await recordVerdict(pi, ctx, sub, parts.slice(1).join(" "));
         return;
       }
 
       const state = loadState(ctx.cwd);
+      const storePath = configResult.config?.attestation.store_path;
+      const verifiedCount = countVerifiedAttestations(ctx.cwd, storePath);
+      const hasVerified = verifiedCount > 0;
+      const rawCount = state.attestationIds.length;
 
-      // Gate: need attestation when required
+      // Gate: need at least one integrity-verified attestation when required
       const attRequired = configResult.config?.attestation.required !== false;
-      if (attRequired && state.attestationIds.length === 0) {
-        ctx.ui.notify(
-          "No attestation recorded. Implementer must call nucleus_attest before /review.",
-          "error",
-        );
+      if (attRequired && !hasVerified) {
+        const detail =
+          rawCount > 0
+            ? `Review blocked: ${rawCount} attestation id(s) in state but none pass integrity verification (forged/corrupt/missing). Produce a real nucleus_attest capture.`
+            : "Review blocked: no verified attestation. Implementer must call nucleus_attest before /review.";
+        ctx.ui.notify(detail, "error");
         pi.sendMessage({
           customType: "nucleus-review-blocked",
-          content:
-            "Review blocked: attestation required. Run verification with nucleus_attest, then /review.",
+          content: detail,
           display: true,
         });
         return;
@@ -50,46 +58,57 @@ export function registerReviewCommand(
       const canStartReview =
         phase === "Attested" ||
         phase === "Reviewing" ||
-        (phase === "Implementing" && state.attestationIds.length > 0);
+        (phase === "Implementing" && hasVerified);
 
       if (!canStartReview) {
         ctx.ui.notify(
-          `Cannot /review from phase ${phase}. Need Attested (after nucleus_attest).`,
+          `Cannot /review from phase ${phase}. Need Attested (after nucleus_attest with verified artifact).`,
           "error",
         );
         return;
       }
 
-      // Advance to Reviewing
-      if (phase === "Implementing" && state.attestationIds.length > 0) {
-        transitionPhase(ctx.cwd, "Attested", { note: "attestation present before review" });
+      // Advance to Reviewing only when a verified attestation exists
+      if (phase === "Implementing" && hasVerified) {
+        transitionPhase(ctx.cwd, "Attested", {
+          note: "verified attestation present before review",
+        });
       }
       const s2 = loadState(ctx.cwd);
       if (s2.phase === "Attested") {
         transitionPhase(ctx.cwd, "Reviewing", {
           role: "reviewer",
-          note: "adversarial review started",
+          note: "adversarial review started (with independent re-exec)",
         });
       }
 
       const roleResult = await applyRole(pi, ctx, "reviewer", configResult);
-      const bundle = buildReviewerContext(ctx.cwd, configResult.config);
+
+      // Default: harness re-executes attested commands into the bundle
+      const bundle = await buildReviewerContext(ctx.cwd, configResult.config, {
+        reverify: true,
+      });
 
       if (!bundle.hasSpec) {
         ctx.ui.notify("Warning: no Spec content found for review.", "warning");
       }
       if (!bundle.hasAttestation) {
-        ctx.ui.notify("Warning: no valid attestation artifacts found.", "warning");
+        ctx.ui.notify("Warning: no verified attestation artifacts found.", "warning");
+      }
+      if (bundle.hasVerificationMismatch) {
+        ctx.ui.notify(
+          "Independent re-execution mismatch detected — Reviewer should default to FAIL.",
+          "warning",
+        );
       }
 
-      // Inject restricted context as the user message that starts the review turn.
-      // Phase 1 hybrid: same session, but we replace the "working set" via a clean
-      // review bundle rather than relying on Implementer chat history.
       const prompt = [
         bundle.text,
         "",
         "---",
         "Perform the adversarial review now. Be skeptical.",
+        "Independent re-execution results are already in the bundle (section 4).",
+        "You may call `nucleus_verify` for a second pass if needed.",
         "When finished, the human can record the outcome with `/review pass` or `/review fail <summary>`.",
       ].join("\n");
 
@@ -161,3 +180,6 @@ async function recordVerdict(
     });
   }
 }
+
+// re-export for tests
+export { hasVerifiedAttestation };

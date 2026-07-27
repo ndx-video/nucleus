@@ -212,3 +212,26 @@ Stops casual model forgery. Not cryptographic unforgeability against a malicious
 External keys, forked Reviewer sessions, free-text claim scanning, broader Phase 2.
 
 ---
+
+### Phase 1.2 — Independent Verification + Residual Polish
+
+**Goal**  
+Status and review gates must only trust integrity-verified attestations; Reviewer must independently re-execute attested commands.
+
+**A. Residual polish**
+1. Status / footer attestation counts use verified loads only (not raw `state.attestationIds`).
+2. `/review` entry requires ≥1 successfully loaded + integrity-verified attestation; forged/invalid IDs alone block review with a clear message.
+
+**B. Independent verification**
+1. Review Bundle includes original attested commands.
+2. By default `/review` re-executes each verified command and embeds comparison (exit code + stdout/stderr).
+3. Tool `nucleus_verify` available to Reviewer for a second pass.
+4. Reviewer prompt treats `exit_mismatch` as strong FAIL evidence; `output_mismatch` as suspicious.
+
+**Residual trust**  
+HMAC integrity + re-execution together. Still not remote attestation; flaky non-determinism can produce output_mismatch without fabrication (surfaced, not hidden).
+
+**Out of scope for 1.2**  
+Forked Reviewer sessions, free-text claim NLP, Phase 2 heavy hooks.
+
+---

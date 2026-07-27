@@ -28,6 +28,7 @@ roles:
       - grep
       - find
       - ls
+      - nucleus_verify   # independent re-execution of attested commands
     adversarial: true
 
 attestation:

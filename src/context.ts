@@ -1,11 +1,20 @@
 /**
  * Restricted context for the Adversarial Reviewer:
- * Spec + Diff + Attestation only (no Implementer chat history).
+ * Spec + Diff + verified Attestation + independent re-execution (Phase 1.2).
  */
 
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { loadAttestation, listAttestations } from "./attestation/index.ts";
+import {
+  getVerifiedAttestations,
+  loadAttestation,
+  listAttestations,
+} from "./attestation/index.ts";
+import {
+  formatVerification,
+  reexecuteAllVerified,
+  type IndependentVerification,
+} from "./attestation/verify.ts";
 import { captureGitDiff } from "./git.ts";
 import { loadState } from "./state.ts";
 import type { NucleusConfig } from "./types.ts";
@@ -13,18 +22,66 @@ import type { NucleusConfig } from "./types.ts";
 export interface ReviewerBundle {
   text: string;
   specPath: string | null;
+  /** Integrity-verified attestation ids only */
   attestationIds: string[];
   hasSpec: boolean;
   hasAttestation: boolean;
   hasDiff: boolean;
+  /** Independent re-execution results (when reverify enabled) */
+  verifications: IndependentVerification[];
+  /** True if any re-execution reported exit or output mismatch */
+  hasVerificationMismatch: boolean;
 }
 
-export function buildReviewerContext(
+export interface BuildReviewerOptions {
+  /**
+   * When true (default for /review), harness re-executes each verified
+   * attestation command and embeds the comparison in the bundle.
+   */
+  reverify?: boolean;
+  timeout_ms?: number;
+}
+
+function formatAttestationBlock(
+  a: NonNullable<ReturnType<typeof loadAttestation>>,
+): string {
+  return [
+    `### ${a.id}`,
+    `- timestamp: ${a.timestamp}`,
+    `- command: \`${a.command}\``,
+    `- exitCode: ${a.exitCode}`,
+    `- durationMs: ${a.durationMs}`,
+    `- cwd: ${a.cwd}`,
+    `- capturedBy: ${a.capturedBy}`,
+    `- integrity: present (HMAC verified by loader)`,
+    `- git.head: ${a.git.head}`,
+    `- git.branch: ${a.git.branch}`,
+    `- git.dirty: ${a.git.dirty}`,
+    `- git.status:`,
+    "```",
+    a.git.status,
+    "```",
+    `- fileHashes: ${JSON.stringify(a.fileHashes, null, 2)}`,
+    ``,
+    `stdout:`,
+    "```",
+    a.stdout || "(empty)",
+    "```",
+    `stderr:`,
+    "```",
+    a.stderr || "(empty)",
+    "```",
+  ].join("\n");
+}
+
+export async function buildReviewerContext(
   cwd: string,
   config: NucleusConfig | null,
-): ReviewerBundle {
+  options?: BuildReviewerOptions,
+): Promise<ReviewerBundle> {
   const state = loadState(cwd);
   const storePath = config?.attestation.store_path;
+  const reverify = options?.reverify !== false;
 
   let specBody = "(no spec on file)";
   let hasSpec = false;
@@ -41,49 +98,65 @@ export function buildReviewerContext(
   const diff = captureGitDiff(cwd);
   const hasDiff = diff !== "(no diff)";
 
-  const ids =
-    state.attestationIds.length > 0
-      ? state.attestationIds
-      : listAttestations(cwd, storePath);
+  // Only integrity-verified artifacts — never raw state IDs alone
+  const verified = getVerifiedAttestations(cwd, storePath);
+  const ids = verified.map((a) => a.id);
+  const hasAttestation = verified.length > 0;
 
-  const attParts: string[] = [];
-  for (const id of ids) {
-    const a = loadAttestation(cwd, id, storePath);
-    if (!a) {
-      attParts.push(`### ${id}\n(missing or invalid artifact — possible forgery or deleted file)\n`);
-      continue;
-    }
-    attParts.push(
-      [
-        `### ${a.id}`,
-        `- timestamp: ${a.timestamp}`,
-        `- command: \`${a.command}\``,
-        `- exitCode: ${a.exitCode}`,
-        `- durationMs: ${a.durationMs}`,
-        `- cwd: ${a.cwd}`,
-        `- capturedBy: ${a.capturedBy}`,
-        `- git.head: ${a.git.head}`,
-        `- git.branch: ${a.git.branch}`,
-        `- git.dirty: ${a.git.dirty}`,
-        `- git.status:`,
-        "```",
-        a.git.status,
-        "```",
-        `- fileHashes: ${JSON.stringify(a.fileHashes, null, 2)}`,
-        ``,
-        `stdout:`,
-        "```",
-        a.stdout || "(empty)",
-        "```",
-        `stderr:`,
-        "```",
-        a.stderr || "(empty)",
-        "```",
-      ].join("\n"),
+  const attParts = verified.map(formatAttestationBlock);
+
+  // Surface raw-vs-verified gap for honesty (forged ids in state)
+  const rawCount = state.attestationIds.length;
+  const invalidRaw =
+    rawCount > ids.length
+      ? `\n> Note: state lists ${rawCount} attestation id(s) but only ${ids.length} pass integrity verification. Invalid/forged ids are ignored.\n`
+      : "";
+
+  let verifications: IndependentVerification[] = [];
+  let verificationSection = "";
+
+  if (reverify && hasAttestation) {
+    verifications = await reexecuteAllVerified(cwd, {
+      storePath,
+      timeout_ms: options?.timeout_ms,
+    });
+    const anyMismatch = verifications.some(
+      (v) => v.verdict === "exit_mismatch" || v.verdict === "output_mismatch",
     );
+    verificationSection = [
+      "",
+      "## 4. Independent re-execution (harness default)",
+      "",
+      "The harness re-ran each attested command in the recorded cwd and compared results.",
+      "This is **not** optional narrative — treat exit_mismatch as strong FAIL evidence.",
+      "You may call `nucleus_verify` again if you need a second pass.",
+      "",
+      verifications.length === 0
+        ? "(re-execution produced no results)"
+        : verifications.map(formatVerification).join("\n\n"),
+      anyMismatch
+        ? "\n**⚠ At least one independent verification did not fully match the attestation.** Default to FAIL unless you have a concrete non-fabrication explanation.\n"
+        : "\nIndependent re-execution aligned with attested results (still check Spec compliance and scope).\n",
+    ].join("\n");
+  } else if (hasAttestation) {
+    verificationSection = [
+      "",
+      "## 4. Independent re-execution",
+      "",
+      "Re-execution was not run for this bundle. **You must call `nucleus_verify`**",
+      `(attestation_id optional; default latest) for: ${ids.map((i) => `\`${i}\``).join(", ")}`,
+      "Treat exit_mismatch as strong FAIL evidence.",
+      "",
+    ].join("\n");
   }
 
-  const hasAttestation = ids.length > 0 && attParts.some((p) => !p.includes("missing or invalid"));
+  const commandList = verified
+    .map((a) => `- \`${a.id}\`: \`${a.command}\` (cwd: ${a.cwd}, attested exit ${a.exitCode})`)
+    .join("\n");
+
+  const hasVerificationMismatch = verifications.some(
+    (v) => v.verdict === "exit_mismatch" || v.verdict === "output_mismatch",
+  );
 
   const text = [
     "# Nucleus Adversarial Review Bundle",
@@ -105,19 +178,29 @@ export function buildReviewerContext(
     diff,
     "```",
     "",
-    "## 3. Attestations",
+    "## 3. Attestations (integrity-verified only)",
     "",
+    invalidRaw,
     ids.length === 0
-      ? "(no attestations recorded — treat any test-pass claims as UNVERIFIED)"
+      ? "(no verified attestations — treat any test-pass claims as UNVERIFIED / FAIL)"
       : attParts.join("\n\n"),
     "",
+    hasAttestation
+      ? ["### Commands to re-verify", "", commandList, ""].join("\n")
+      : "",
+    verificationSection,
     "## Required output",
     "",
     "Return:",
     "1. **Verdict:** PASS or FAIL",
-    "2. **Findings:** bullet list (fabrication, missing evidence, scope drift, Spec violations)",
-    "3. **Evidence notes:** which attestation fields you inspected",
+    "2. **Findings:** bullet list (fabrication, missing evidence, scope drift, Spec violations, re-exec mismatch)",
+    "3. **Evidence notes:** attestation fields + independent re-execution results you relied on",
     "4. **Recommended next step:** Accept / Reject / Request re-implement / Request re-attest",
+    "",
+    "Rules:",
+    "- **exit_mismatch** on independent re-execution → strong FAIL signal.",
+    "- **output_mismatch** with matching exit → suspicious; investigate before PASS.",
+    "- Integrity-valid artifact without Spec compliance is still FAIL.",
   ].join("\n");
 
   return {
@@ -127,8 +210,13 @@ export function buildReviewerContext(
     hasSpec,
     hasAttestation,
     hasDiff,
+    verifications,
+    hasVerificationMismatch,
   };
 }
+
+// re-export for callers that only need the list helper
+export { listAttestations };
 
 export const SPEC_TEMPLATE = `# Nucleus Spec
 

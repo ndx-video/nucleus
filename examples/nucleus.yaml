@@ -10,7 +10,7 @@ roles:
   implementer:
     allowed_tools: ["read", "write", "edit", "bash", "grep", "find", "ls", "nucleus_attest"]
   reviewer:
-    allowed_tools: ["read", "bash", "grep", "find", "ls"]
+    allowed_tools: ["read", "bash", "grep", "find", "ls", "nucleus_verify"]
     adversarial: true
 
 attestation:

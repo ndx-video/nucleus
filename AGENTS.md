@@ -79,11 +79,13 @@ Keep Specs lean. Prefer one clear markdown artifact over many files in Phase 1.
 - The Adversarial Reviewer **must** receive and inspect the attestation. It may re-run commands if suspicious.
 - Fabricating or hand-writing an attestation is a critical honesty violation.
 
-### Residual trust model (Phase 1.1)
+### Residual trust model (Phase 1.1–1.2)
 
-- **Stops:** casual model forgery (hand-written JSON that only sets `capturedBy: "nucleus_attest"`), and content tampering after a real capture.
-- **Does not stop:** a malicious process with full filesystem access that can read `.nucleus/attest.key` and write a matching MAC. This is intentional local-first design, not unforgeable remote attestation.
-- Phase 1 live-validated 2026-07-27 (`nucleus-test`); integrity hardening closed the remaining marker-only leak.
+- **Stops:** casual model forgery (hand-written JSON that only sets `capturedBy: "nucleus_attest"`), content tampering after a real capture, and status/`/review` gates that trusted raw state IDs without integrity load.
+- **Independent verification (1.2):** `/review` re-executes attested commands by default and embeds MATCH / EXIT MISMATCH / OUTPUT MISMATCH. Reviewer tool `nucleus_verify` can re-run again. Exit mismatch is a strong FAIL signal.
+- **Does not stop:** a malicious process with full filesystem access that can read `.nucleus/attest.key` and write a matching MAC; fully non-deterministic tests that pass once and fail on re-exec (surfaced as mismatch, not silently trusted).
+- This is intentional local-first design, not unforgeable remote attestation.
+- Phase 1 live-validated 2026-07-27 (`nucleus-test`); 1.1 closed marker-only forgery; 1.2 adds verified-only gates + independent re-execution.
 
 ## Model Nomination
 

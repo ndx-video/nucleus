@@ -3,6 +3,10 @@
  */
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import {
+  countVerifiedAttestations,
+  latestVerifiedAttestationId,
+} from "../attestation/index.ts";
 import type { LoadConfigResult } from "../config.ts";
 import { allowedNextPhases, formatStatus, loadState } from "../state.ts";
 import type { StatusSnapshot } from "../types.ts";
@@ -12,16 +16,18 @@ export function buildStatusSnapshot(
   configResult: LoadConfigResult,
 ): StatusSnapshot {
   const state = loadState(cwd);
+  const storePath = configResult.config?.attestation.store_path;
+  const verifiedCount = countVerifiedAttestations(cwd, storePath);
+  const latestVerifiedId = latestVerifiedAttestationId(cwd, storePath);
+
   return {
     phase: state.phase,
     role: state.role,
     changeId: state.changeId,
     specPath: state.specPath,
-    attestationCount: state.attestationIds.length,
-    latestAttestationId:
-      state.attestationIds.length > 0
-        ? state.attestationIds[state.attestationIds.length - 1]!
-        : null,
+    // Phase 1.2: only integrity-verified attestations
+    attestationCount: verifiedCount,
+    latestAttestationId: latestVerifiedId,
     reviewResult: state.reviewResult,
     overrideReason: state.overrideReason,
     models: configResult.config?.models ?? null,
@@ -40,7 +46,11 @@ export function formatFullStatus(
   const lines = [
     "═══ Nucleus — The Honesty Harness ═══",
     "",
-    formatStatus(state),
+    formatStatus(state, {
+      verifiedCount: snap.attestationCount,
+      latestVerifiedId: snap.latestAttestationId,
+      rawCount: state.attestationIds.length,
+    }),
     "",
     "── Config ──",
     snap.configLoaded
@@ -53,7 +63,7 @@ export function formatFullStatus(
       : `  ERROR: ${snap.configError}`,
     "",
     "── Loop ──",
-    "  Spec → Implement → Attest → Review → Accept/Reject → Retro",
+    "  Spec → Implement → Attest → Review (+ independent re-exec) → Accept/Reject → Retro",
     "",
     "── Commands ──",
     "  /spec  /implement  /review  /accept  /retro  /nucleus",
@@ -68,7 +78,6 @@ export function registerStatusCommands(
   const handler = async (_args: string, ctx: ExtensionCommandContext) => {
     const text = formatFullStatus(ctx.cwd, getConfig());
     ctx.ui.notify("Nucleus status", "info");
-    // Surface full status to the agent + user via custom message
     pi.sendMessage({
       customType: "nucleus-status",
       content: text,

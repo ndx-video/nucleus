@@ -26,7 +26,7 @@ const DEFAULT_IMPLEMENTER_ROLE: RoleConfig = {
 };
 
 const DEFAULT_REVIEWER_ROLE: RoleConfig = {
-  allowed_tools: ["read", "bash", "grep", "find", "ls"],
+  allowed_tools: ["read", "bash", "grep", "find", "ls", "nucleus_verify"],
   adversarial: true,
 };
 
@@ -144,6 +144,12 @@ export function validateConfig(raw: unknown): NucleusConfig {
   };
   if (reviewerRole.adversarial === undefined) {
     reviewerRole.adversarial = true;
+  }
+  // Always ensure nucleus_verify is available for independent re-execution (Phase 1.2)
+  if (!reviewerRole.allowed_tools) {
+    reviewerRole.allowed_tools = [...(DEFAULT_REVIEWER_ROLE.allowed_tools ?? [])];
+  } else if (!reviewerRole.allowed_tools.includes("nucleus_verify")) {
+    reviewerRole.allowed_tools = [...reviewerRole.allowed_tools, "nucleus_verify"];
   }
 
   const plannerRole: RoleConfig = {
@@ -271,7 +277,7 @@ roles:
   implementer:
     allowed_tools: ["read", "write", "edit", "bash", "grep", "find", "ls", "nucleus_attest"]
   reviewer:
-    allowed_tools: ["read", "bash", "grep", "find", "ls"]  # no write by default
+    allowed_tools: ["read", "bash", "grep", "find", "ls", "nucleus_verify"]  # no write; re-exec tool
     adversarial: true
 
 attestation:

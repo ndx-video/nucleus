@@ -17,7 +17,7 @@ export const REVIEW_SESSION_FILE = "review-session.json";
 /** Full Review Bundle text written for isolated session injection + audit */
 export const REVIEW_BUNDLE_FILE = "review-bundle.md";
 /** Incrementing export of assistant responses via /copy-out */
-export const OUT_DIR = "out";
+export const OUT_DIR = ".out";
 /** Append-only phase/attestation history (rotated by size) */
 export const HISTORY_FILE = "history.jsonl";
 
@@ -53,7 +53,7 @@ export function reviewBundlePath(cwd: string): string {
 }
 
 export function outDir(cwd: string): string {
-  return join(nucleusRoot(cwd), OUT_DIR);
+  return resolve(cwd, OUT_DIR);
 }
 
 export function historyPath(cwd: string): string {
@@ -81,10 +81,6 @@ export function ensureNucleusLayout(cwd: string, storePath?: string): void {
   const specs = specsDir(cwd);
   if (!existsSync(specs)) {
     mkdirSync(specs, { recursive: true });
-  }
-  const out = outDir(cwd);
-  if (!existsSync(out)) {
-    mkdirSync(out, { recursive: true });
   }
 }
 

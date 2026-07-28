@@ -1,11 +1,11 @@
 /**
- * /copy-out <n> — copy the Nth most recent assistant response to .nucleus/out/NNNN.md
+ * /copy-out <n> — copy the Nth most recent assistant response to .out/NNNN.md
  *
  * Recency index: 1 = most recent assistant reply, 2 = previous, etc.
  * Filenames increment independently: 0001.md, 0002.md, …
  */
 
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { ensureNucleusLayout, outDir, toProjectRelative } from "../paths.ts";
@@ -72,10 +72,66 @@ export function formatOutFilename(index: number): string {
   return `${String(index).padStart(4, "0")}.md`;
 }
 
+function stripGitignoreLineComments(line: string): string {
+  // In gitignore, `#` starts a comment when preceded by whitespace.
+  // This heuristic is good enough for our simple "did user add .out/ line?" checks.
+  return line.replace(/\s+#.*$/, "").trim();
+}
+
+/** Detect whether `.gitignore` includes an ignore entry for a specific top-level dir. */
+export function gitignoreHasDirIgnore(gitignoreText: string, dir: ".out" | ".nucleus"): boolean {
+  const needles = new Set([
+    `${dir}/`,
+    dir,
+    `${dir}/**`,
+    `${dir}/*`,
+  ]);
+  for (const rawLine of gitignoreText.split(/\r?\n/)) {
+    const line = stripGitignoreLineComments(rawLine);
+    if (!line || line.startsWith("#")) continue;
+    if (needles.has(line)) return true;
+  }
+  return false;
+}
+
+export type CopyOutGitignoreWarning = {
+  severity: "warning" | "error";
+  message: string;
+};
+
+export function computeCopyOutGitignoreWarnings(args: {
+  outExists: boolean;
+  gitignoreText: string;
+}): CopyOutGitignoreWarning[] {
+  const warnings: CopyOutGitignoreWarning[] = [];
+
+  const outIgnored = gitignoreHasDirIgnore(args.gitignoreText, ".out");
+  if (args.outExists && !outIgnored) {
+    warnings.push({
+      severity: "warning",
+      message:
+        "STERN WARNING: `.out/` exists but is not ignored in `.gitignore`. " +
+        "Add `.out/` to prevent committing exported assistant responses.",
+    });
+  }
+
+  const nucleusIgnored = gitignoreHasDirIgnore(args.gitignoreText, ".nucleus");
+  if (!nucleusIgnored) {
+    warnings.push({
+      severity: "warning",
+      message:
+        "WARNING: `.nucleus/` is not ignored in `.gitignore`. " +
+        "This harness writes runtime state and attestation artifacts; add `.nucleus/`.",
+    });
+  }
+
+  return warnings;
+}
+
 export function registerCopyOutCommand(pi: ExtensionAPI): void {
   pi.registerCommand("copy-out", {
     description:
-      "Copy Nth most recent assistant reply to .nucleus/out/NNNN.md (1 = most recent)",
+      "Copy Nth most recent assistant reply to .out/NNNN.md (1 = most recent)",
     handler: async (args, ctx: ExtensionCommandContext) => {
       const raw = (args ?? "").trim();
       // Default to most recent when no args
@@ -93,6 +149,16 @@ export function registerCopyOutCommand(pi: ExtensionAPI): void {
       const dir = outDir(ctx.cwd);
       if (!existsSync(dir)) {
         mkdirSync(dir, { recursive: true });
+      }
+      const gitignorePath = join(ctx.cwd, ".gitignore");
+      const gitignoreText = existsSync(gitignorePath)
+        ? readFileSync(gitignorePath, "utf-8")
+        : "";
+      for (const w of computeCopyOutGitignoreWarnings({
+        outExists: existsSync(dir),
+        gitignoreText,
+      })) {
+        ctx.ui.notify(w.message, w.severity);
       }
 
       let branch: Array<{ type?: string; message?: AssistantLike }> = [];

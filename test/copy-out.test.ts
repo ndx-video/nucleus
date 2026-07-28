@@ -5,8 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   collectAssistantTexts,
+  computeCopyOutGitignoreWarnings,
   formatOutFilename,
   nextOutFileIndex,
+  gitignoreHasDirIgnore,
   pickByRecency,
 } from "../src/commands/copy-out.ts";
 
@@ -48,5 +50,38 @@ describe("copy-out helpers", () => {
     assert.equal(formatOutFilename(1), "0001.md");
     assert.equal(formatOutFilename(42), "0042.md");
     assert.equal(formatOutFilename(1234), "1234.md");
+  });
+
+  it("gitignoreHasDirIgnore detects .out/ ignore entries", () => {
+    assert.equal(gitignoreHasDirIgnore(".out/\n", ".out"), true);
+    assert.equal(gitignoreHasDirIgnore(".out\n", ".out"), true);
+    assert.equal(gitignoreHasDirIgnore(".out/**\n", ".out"), true);
+    assert.equal(gitignoreHasDirIgnore("out/\n", ".out"), false);
+  });
+
+  it("computeCopyOutGitignoreWarnings warns when .out exists but is not ignored", () => {
+    const warnings = computeCopyOutGitignoreWarnings({
+      outExists: true,
+      gitignoreText: ".nucleus/\n",
+    });
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0]!.message, /STERN WARNING/);
+  });
+
+  it("computeCopyOutGitignoreWarnings warns when .nucleus is not ignored", () => {
+    const warnings = computeCopyOutGitignoreWarnings({
+      outExists: false,
+      gitignoreText: "",
+    });
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0]!.message, /WARNING: `\.nucleus/);
+  });
+
+  it("computeCopyOutGitignoreWarnings returns both warnings when both are missing", () => {
+    const warnings = computeCopyOutGitignoreWarnings({
+      outExists: true,
+      gitignoreText: "",
+    });
+    assert.equal(warnings.length, 2);
   });
 });

@@ -375,7 +375,8 @@ Typical fields:
   attest.key              # project HMAC secret (do not commit)
   review-bundle.md        # last Review Bundle
   review-session.json     # isolation metadata
-  out/NNNN.md             # /copy-out exports
+.out/
+  NNNN.md                 # /copy-out exports
 ```
 
 **Spec rotation:** `/accept` archives the active Spec. The next `/spec` (new change) archives any leftover and writes a **fresh** `current.md` template so prior-phase Specs do not pretend to be “current.”

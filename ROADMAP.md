@@ -320,9 +320,9 @@ Pi supports `npm:`, `git:`, and local paths. The npm name `nucleus` is **taken**
 
 | Command | Status |
 |---------|--------|
-| `pi install git:github.com/ndx-video/nucleus` | **Preferred one-liner** |
-| `pi install -l git:github.com/ndx-video/nucleus` | Project-local |
-| `pi install npm:@ndx-video/nucleus` | Future — after scoped npm publish |
+| `pi install git:github.com/ndx-au/nucleus` | **Preferred one-liner** |
+| `pi install -l git:github.com/ndx-au/nucleus` | Project-local |
+| `pi install npm:@ndx-au/nucleus` | Future — after scoped npm publish |
 
 **Docs**  
 Single primary page: [`docs/index.md`](./docs/index.md) (install, config, loop, three layers, 60s walkthrough, troubleshooting).  

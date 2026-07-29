@@ -23,29 +23,29 @@ Non-trivial work goes through: **Spec → Implement → Attest (real capture) �
 ### One-liner (recommended)
 
 ```bash
-pi install git:github.com/ndx-video/nucleus
+pi install git:github.com/ndx-au/nucleus
 ```
 
 That installs globally for your user (`~/.pi/agent/…`). For **project-local** install (team-shareable `.pi/settings.json`):
 
 ```bash
-pi install -l git:github.com/ndx-video/nucleus
+pi install -l git:github.com/ndx-au/nucleus
 ```
 
 Equivalents that also work:
 
 ```bash
-pi install https://github.com/ndx-video/nucleus
-pi install git:github.com/ndx-video/nucleus@main
+pi install https://github.com/ndx-au/nucleus
+pi install git:github.com/ndx-au/nucleus@main
 ```
 
 ### Not yet: `pi install nucleus`
 
-`nucleus` on npm is an **unrelated** package. A clean registry one-liner would require publishing under a free name (e.g. `npm:@ndx-video/nucleus`), then:
+`nucleus` on npm is an **unrelated** package. A clean registry one-liner would require publishing under a free name (e.g. `npm:@ndx-au/nucleus`), then:
 
 ```bash
 # future (after npm publish under a scoped name)
-pi install npm:@ndx-video/nucleus
+pi install npm:@ndx-au/nucleus
 ```
 
 Until then, use the **git** one-liner above.
@@ -289,7 +289,7 @@ attestation:
   require_real_stdout: true
 EOF
 
-pi install -l git:github.com/ndx-video/nucleus
+pi install -l git:github.com/ndx-au/nucleus
 pi
 ```
 
@@ -421,4 +421,4 @@ Tool (not a slash command): `nucleus_attest` with `command: "…"`.
 | [nucleus.config.example.yaml](../nucleus.config.example.yaml) | Full annotated config |
 | [examples/](../examples/) | Minimal `nucleus.yaml` |
 
-**Site:** [nucleuspi.dev](https://nucleuspi.dev) · **Source:** [github.com/ndx-video/nucleus](https://github.com/ndx-video/nucleus)
+**Site:** [nucleuspi.dev](https://nucleuspi.dev) · **Source:** [github.com/ndx-au/nucleus](https://github.com/ndx-au/nucleus)

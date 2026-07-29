@@ -5,8 +5,8 @@
 ## Install + config
 
 ```bash
-pi install git:github.com/ndx-video/nucleus
-# project-local: pi install -l git:github.com/ndx-video/nucleus
+pi install git:github.com/ndx-au/nucleus
+# project-local: pi install -l git:github.com/ndx-au/nucleus
 
 cp ../nucleus.config.example.yaml ./nucleus.yaml   # from a clone
 # edit models.* to match your Pi providers

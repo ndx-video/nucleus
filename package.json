@@ -14,10 +14,10 @@
   "homepage": "https://nucleuspi.dev",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ndx-video/nucleus.git"
+    "url": "git+https://github.com/ndx-au/nucleus.git"
   },
   "bugs": {
-    "url": "https://github.com/ndx-video/nucleus/issues"
+    "url": "https://github.com/ndx-au/nucleus/issues"
   },
   "files": [
     "src",

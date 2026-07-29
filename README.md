@@ -6,7 +6,7 @@
 
 Local-first coding agent package for [Pi](https://pi.dev). Restores trust in generative coding through Specs, harness-owned attestation, independent re-execution, and isolated adversarial review.
 
-**Docs (start here):** [docs/index.md](./docs/index.md) · **Site:** [nucleuspi.dev](https://nucleuspi.dev) · **Source:** [github.com/ndx-video/nucleus](https://github.com/ndx-video/nucleus)
+**Docs (start here):** [docs/index.md](./docs/index.md) · **Site:** [nucleuspi.dev](https://nucleuspi.dev) · **Source:** [github.com/ndx-au/nucleus](https://github.com/ndx-au/nucleus)
 
 ---
 
@@ -15,13 +15,13 @@ Local-first coding agent package for [Pi](https://pi.dev). Restores trust in gen
 **Prerequisite:** Pi on your PATH.
 
 ```bash
-pi install git:github.com/ndx-video/nucleus
+pi install git:github.com/ndx-au/nucleus
 ```
 
 Project-local (writes `.pi/settings.json`):
 
 ```bash
-pi install -l git:github.com/ndx-video/nucleus
+pi install -l git:github.com/ndx-au/nucleus
 ```
 
 Then in your project:
@@ -37,11 +37,11 @@ pi
 
 | Form | Works? | Notes |
 |------|--------|--------|
-| `pi install git:github.com/ndx-video/nucleus` | **Yes — preferred** | Git install; runs `npm install` for `yaml` |
-| `pi install https://github.com/ndx-video/nucleus` | Yes | Same source |
+| `pi install git:github.com/ndx-au/nucleus` | **Yes — preferred** | Git install; runs `npm install` for `yaml` |
+| `pi install https://github.com/ndx-au/nucleus` | Yes | Same source |
 | `pi install -l /path/to/clone` | Yes | Local development |
 | `pi install nucleus` | **No** | npm name `nucleus` is an unrelated package |
-| `pi install npm:@ndx-video/nucleus` | Not yet | Publish scoped package for a registry one-liner |
+| `pi install npm:@ndx-au/nucleus` | Not yet | Publish scoped package for a registry one-liner |
 
 Full walkthrough: **[docs/index.md](./docs/index.md)**.
 
